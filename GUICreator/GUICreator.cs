@@ -1,12 +1,10 @@
-﻿using ConVar;
-using Facepunch.Extend;
+﻿//#define DEBUG
+
 using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
-using WebSocketSharp;
 
 namespace Oxide.Plugins
 {
@@ -33,7 +31,9 @@ namespace Oxide.Plugins
         {
             permission.RegisterPermission("GC.use", this);
 
-            cmd.AddConsoleCommand("gc.closeui", this, nameof(closeGuiConsole));
+            cmd.AddConsoleCommand("gc.close", this, nameof(closeUi));
+            cmd.AddConsoleCommand("gc.button", this, nameof(OnButtonClick));
+            cmd.AddConsoleCommand("gc.input", this, nameof(OnGuiInput));
         }
 
         void OnServerInitialized()
@@ -116,6 +116,24 @@ namespace Oxide.Plugins
             }
         }
 
+        public class GuiText
+        {
+            public string text;
+            public int fontSize;
+            public TextAnchor align;
+            public GuiColor color;
+
+            public GuiText() { }
+
+            public GuiText(string text, int fontSize = 14, GuiColor color = null, TextAnchor align = TextAnchor.MiddleCenter)
+            {
+                this.text = text;
+                this.fontSize = fontSize;
+                this.align = align;
+                this.color = color ?? new GuiColor(0, 0, 0, 1);
+            }
+        }
+
         public class CuiInputField
         {
             //public CuiImageComponent Image { get; set; } = new CuiImageComponent();
@@ -127,15 +145,45 @@ namespace Oxide.Plugins
 
         public class GuiContainer : CuiElementContainer
         {
-            public enum Layer { overall = 0, overlay, menu, hud, under };
+            public string name;
+            public List<Timer> timers = new List<Timer>();
+            private Dictionary<string, Action<BasePlayer>> callbacks = new Dictionary<string, Action<BasePlayer>>();
+
+            public GuiContainer(string name)
+            {
+                this.name = name;
+            }
+
+            public enum Layer { overall, overlay, menu, hud, under };
             //Rust UI elements (inventory, Health, etc.) are between the hud and the menu layer
             private List<string> layers = new List<string> {"Overall", "Overlay", "Hud.Menu", "Hud", "Under"};
 
             public void display(BasePlayer player)
             {
                 if (this.Count == 0) return;
-                GuiTracker.getGuiTracker(player).addGuiToTracker(this.First().Name, this);
+                GuiTracker.getGuiTracker(player).addGuiToTracker(this);
                 CuiHelper.AddUi(player, this);
+            }
+
+            public void registerCallback(string name, Action<BasePlayer> callback)
+            {
+                if (callbacks.ContainsKey(name)) callbacks.Remove(name);
+                callbacks.Add(name, callback);
+            }
+
+            public bool runCallback(string name, BasePlayer player)
+            {
+                if (!callbacks.ContainsKey(name)) return false;
+                try
+                {
+                    callbacks[name](player);
+                    return true;
+                }
+                catch(Exception E)
+                {
+                    PluginInstance.Puts($"Failed to run callback: {name}, {E.Message}");
+                    return false;
+                }
             }
 
             public string Add(CuiInputField InputField, string Parent = "Hud", string Name = "")
@@ -159,7 +207,7 @@ namespace Oxide.Plugins
                 return Name;
             }
 
-            public void addPanel(string name, Rectangle rectangle, Layer layer = Layer.hud, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, string text = null, int fontSize = 14, TextAnchor align = TextAnchor.MiddleCenter, GuiColor textColor = null, string imgName = null)
+            public void addPanel(string name, Rectangle rectangle, Layer layer = Layer.hud, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null)
             {
                 if (string.IsNullOrEmpty(name))
                 {
@@ -173,7 +221,7 @@ namespace Oxide.Plugins
                 {
                     this.addImage(name, rectangle, imgName, layer, panelColor, FadeIn, FadeOut);
                 }
-                if (!text.IsNullOrEmpty()) this.addText(name + "_txt", rectangle, text, layer, textColor, fontSize, align, FadeIn, FadeOut);
+                if (text != null) this.addText(name + "_txt", rectangle, layer, text, FadeIn, FadeOut);
             }
 
             public void addPlainPanel(string name, Rectangle rectangle, Layer layer = Layer.hud, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
@@ -210,7 +258,7 @@ namespace Oxide.Plugins
                 });
             }
 
-            public void addText(string name, Rectangle rectangle, string text, Layer layer = Layer.hud, GuiColor textColor = null, int fontSize = 14, TextAnchor align = TextAnchor.MiddleCenter, float FadeIn = 0, float FadeOut = 0)
+            public void addText(string name, Rectangle rectangle, Layer layer = Layer.hud, GuiText text = null, float FadeIn = 0, float FadeOut = 0)
             {
                 if (string.IsNullOrEmpty(name)) name = "text";
 
@@ -220,32 +268,32 @@ namespace Oxide.Plugins
                     Name = name,
                     Components =
                 {
-                    new CuiTextComponent { FadeIn = FadeIn, Text = text, FontSize = fontSize, Align = align, Color = (textColor != null)?textColor.getColorString():"0 0 0 1" },
+                    new CuiTextComponent { FadeIn = FadeIn, Text = text.text, FontSize = text.fontSize, Align = text.align, Color = text.color.getColorString()},
                     new CuiRectTransformComponent { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax }
                 },
                     FadeOut = FadeOut
                 });
             }
 
-            public void addButton(string name, Rectangle rectangle, string command = null, Layer layer = Layer.hud, GuiColor panelColor = null, float FadeIn = 0, string text = null, int fontSize = 14, TextAnchor align = TextAnchor.MiddleCenter, GuiColor textColor = null, bool CursorEnabled = false, string imgName = null)
+            public void addButton(string name, Rectangle rectangle, GuiColor panelColor = null, float FadeIn = 0, GuiText text = null, Action<BasePlayer> callback = null, bool close = false, bool CursorEnabled = true, string imgName = null, Layer layer = Layer.hud)
             {
                 if (string.IsNullOrEmpty(name)) name = "button";
                 if (layer == Layer.under) layer = Layer.hud;
 
-                this.addPlainButton(name, rectangle, layer, command, panelColor, FadeIn, text, fontSize, align, textColor, CursorEnabled);
+                this.addPlainButton(name, rectangle, panelColor, FadeIn, text, callback, close, CursorEnabled, layer);
 
                 if (imgName != null) this.addImage(name + "_img", rectangle, imgName, layer + 1, null, FadeIn);
             }
 
-            public void addPlainButton(string name, Rectangle rectangle, Layer layer = Layer.hud, string command = null, GuiColor panelColor = null, float FadeIn = 0, string text = null, int fontSize = 14, TextAnchor align = TextAnchor.MiddleCenter, GuiColor textColor = null, bool CursorEnabled = false)
+            public void addPlainButton(string name, Rectangle rectangle, GuiColor panelColor = null, float FadeIn = 0, GuiText text = null, Action<BasePlayer> callback = null, bool close = false, bool CursorEnabled = true, Layer layer = Layer.hud)
             {
                 if (string.IsNullOrEmpty(name)) name = "plainButton";
 
                 this.Add(new CuiButton()
                 {
-                    Button = { Command = command, FadeIn = FadeIn, Color = (panelColor != null) ? panelColor.getColorString() : "0 0 0 0" },
+                    Button = { Command = $"gc.button {this.name} {name}{(close?" close":"")}", FadeIn = FadeIn, Color = (panelColor != null) ? panelColor.getColorString() : "0 0 0 0" },
                     RectTransform = { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax },
-                    Text = { Text = text, Align = align, FontSize = fontSize, FadeIn = FadeIn, Color = (textColor != null) ? textColor.getColorString() : "0 0 0 1" },
+                    Text = { Text = text.text, Align = text.align, FontSize = text.fontSize, FadeIn = FadeIn, Color = text.color.getColorString() },
                 }, layers[(int)layer], name);
 
                 if (CursorEnabled)
@@ -259,16 +307,18 @@ namespace Oxide.Plugins
                     }
                     });
                 }
+
+                if (callback != null) this.registerCallback(name, callback);
             }
 
-            public void addInput(string name, Rectangle rectangle, string command, Layer layer = Layer.hud, GuiColor panelColor = null, int charLimit = 100, int fontSize = 14, TextAnchor align = TextAnchor.MiddleCenter, GuiColor textColor = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = false, string imgName = null)
+            public void addInput(string name, Rectangle rectangle, string command, Layer layer = Layer.hud, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
             {
                 if (string.IsNullOrEmpty(name)) name = "input";
                 if (layer == Layer.under) layer = Layer.hud;
 
                 this.Add(new CuiInputField()
                 {
-                    InputField = { Align = align, FontSize = fontSize, Color = (textColor != null) ? textColor.getColorString() : "1 1 1 1", Command = command, CharsLimit = charLimit, IsPassword = isPassword },
+                    InputField = { Align = text.align, FontSize = text.fontSize, Color = text.color.getColorString(), Command = command, CharsLimit = charLimit, IsPassword = isPassword },
                     RectTransform = { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax },
                     CursorEnabled = CursorEnabled,
                     FadeOut = FadeOut
@@ -281,7 +331,7 @@ namespace Oxide.Plugins
         public class GuiTracker : MonoBehaviour
         {
             BasePlayer player;
-            Dictionary<string, List<string>> activeGuiElements = new Dictionary<string, List<string>>();
+            List<GuiContainer> activeGuiContainers = new List<GuiContainer>();
 
             public static GuiTracker getGuiTracker(BasePlayer player)
             {
@@ -298,40 +348,77 @@ namespace Oxide.Plugins
                 return output;
             }
 
-            public void addGuiToTracker(string name, GuiContainer container)
+            public GuiContainer getContainer(string name)
             {
-                if (activeGuiElements.ContainsKey(name)) destroyGui(name);
-
-                List<string> names = new List<string>();
-                foreach (CuiElement element in container)
+                foreach(GuiContainer container in activeGuiContainers)
                 {
-                    names.Add(element.Name);
+                    if (container.name == name) return container;
                 }
+                return null;
+            }
 
-                activeGuiElements.Add(name, names);
+            public void addGuiToTracker(GuiContainer container)
+            {
+#if DEBUG
+                PluginInstance.PrintToChat($"adding {container.name} to tracker");
+#endif
+                activeGuiContainers.Add(container);
+            }
+
+            public void destroyGui(GuiContainer container)
+            {
+                if (activeGuiContainers.Contains(container))
+                {
+                    foreach (CuiElement element in container)
+                    {
+                        CuiHelper.DestroyUi(player, element.Name);
+                    }
+#if DEBUG
+                    PluginInstance.PrintToChat($"cloing container.name: {container.name}");
+#endif
+                    foreach (Timer timer in container.timers)
+                    {
+                        timer.Destroy();
+#if DEBUG
+                        if (timer.Destroyed)
+                        {
+                            PluginInstance.PrintToChat($"{container.name} timer destroyed!");
+                        }
+#endif
+                    }
+
+                    activeGuiContainers.Remove(container);
+                    //if (activeGuiElements.Count == 0) Destroy(this);
+                }
+                else PluginInstance.Puts($"destroyGui(container.name: {container.name}): no GUI containers found");
             }
 
             public void destroyGui(string name)
             {
-                if (activeGuiElements.ContainsKey(name))
+                GuiContainer container = null;
+                foreach(GuiContainer cont in activeGuiContainers)
                 {
-                    foreach (string element in activeGuiElements[name])
-                    {
-                        CuiHelper.DestroyUi(player, element);
-                    }
-                    activeGuiElements.Remove(name);
-                    if (activeGuiElements.Count == 0) Destroy(this);
+                    if (cont.name == name) container = cont;
                 }
-                else PluginInstance.Puts($"destroyGui({name}): no GUI containers found");
+                if(container == null)
+                {
+                    PluginInstance.Puts($"destroyGui({name}): no GUI containers found");
+                    return;
+                }
+                destroyGui(container);
             }
 
             public void destroyAllGui()
             {
-                foreach (List<string> names in activeGuiElements.Values)
+                foreach (GuiContainer container in activeGuiContainers)
                 {
-                    foreach (string name in names)
+                    foreach (Timer timer in container.timers)
                     {
-                        CuiHelper.DestroyUi(player, name);
+                        timer.Destroy();
+                    }
+                    foreach (CuiElement element in container)
+                    {
+                        CuiHelper.DestroyUi(player, element.Name);
                     }
                 }
                 Destroy(this);
@@ -347,80 +434,80 @@ namespace Oxide.Plugins
         {
             GuiTracker.getGuiTracker(player).destroyGui("gameTip");
 
-            GuiContainer container = new GuiContainer();
+            GuiContainer container = new GuiContainer("gameTip");
             container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.hud, new GuiColor("#25639BF0"), 0.5f, 1);
-            container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), text, GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 20, FadeIn: 0.5f, FadeOut: 1);
+            container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
             container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "gameTipIcon", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
-            GuiTracker.getGuiTracker(player).addGuiToTracker("gameTip", container);
-            CuiHelper.AddUi(player, container);
 
             if (duration != 0)
             {
-                timer.Once(duration, () =>
+                Timer closeTimer = timer.Once(duration, () =>
                 {
-                    GuiTracker.getGuiTracker(player).destroyGui("gameTip");
+                    GuiTracker.getGuiTracker(player).destroyGui(container);
                 });
+                container.timers.Add(closeTimer);
             }
+            container.display(player);
         }
 
         public void warningGameTip1(BasePlayer player, string text, float duration = 0)
         {
             GuiTracker.getGuiTracker(player).destroyGui("gameTip");
 
-            GuiContainer container = new GuiContainer();
+            GuiContainer container = new GuiContainer("gameTip");
             container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("#DED502F0"), 0.5f, 1);
-            container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), text, GuiContainer.Layer.hud, new GuiColor("#000000D9"), 20, FadeIn: 0.5f, FadeOut: 1);
+            container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#000000D9")), 0.5f, 1);
             container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "warning_alpha", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
-            GuiTracker.getGuiTracker(player).addGuiToTracker("gameTip", container);
-            CuiHelper.AddUi(player, container);
 
             if (duration != 0)
             {
-                timer.Once(duration, () =>
+                Timer closeTimer = timer.Once(duration, () =>
                 {
-                    GuiTracker.getGuiTracker(player).destroyGui("gameTip");
+                    GuiTracker.getGuiTracker(player).destroyGui(container);
                 });
+                container.timers.Add(closeTimer);
             }
+            container.display(player);
         }
 
         public void warningGameTip2(BasePlayer player, string text, float duration = 0)
         {
             GuiTracker.getGuiTracker(player).destroyGui("gameTip");
 
-            GuiContainer container = new GuiContainer();
+            GuiContainer container = new GuiContainer("gameTip");
             container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("#DED502F0"), 0.5f, 1);
             container.addImage("gametip_mask", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "warning_mask", GuiContainer.Layer.hud, new GuiColor("#FFFFFFFF"), 0.5f, 1);
-            container.addText("gametip_txt", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), text, GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 20, FadeIn: 0.5f, FadeOut: 1);
-            GuiTracker.getGuiTracker(player).addGuiToTracker("gameTip", container);
-            CuiHelper.AddUi(player, container);
+            container.addText("gametip_txt", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
 
             if (duration != 0)
             {
-                timer.Once(duration, () =>
+                Timer closeTimer = timer.Once(duration, () =>
                 {
-                    GuiTracker.getGuiTracker(player).destroyGui("gameTip");
+                    GuiTracker.getGuiTracker(player).destroyGui(container);
                 });
+                container.timers.Add(closeTimer);
             }
+            container.display(player);
         }
 
         public void errorGameTip(BasePlayer player, string text, float duration = 0)
         {
             GuiTracker.getGuiTracker(player).destroyGui("gameTip");
 
-            GuiContainer container = new GuiContainer();
+            GuiContainer container = new GuiContainer("gameTip");
             container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.hud, new GuiColor("#BB0000F0"), 0.5f, 1);
-            container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), text, GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 20, FadeIn: 0.5f, FadeOut: 1);
+            container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
             container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "white_cross", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
-            GuiTracker.getGuiTracker(player).addGuiToTracker("gameTip", container);
-            CuiHelper.AddUi(player, container);
 
             if (duration != 0)
             {
-                timer.Once(duration, () =>
+                Timer closeTimer = timer.Once(duration, () =>
                 {
-                    GuiTracker.getGuiTracker(player).destroyGui("gameTip");
+                    GuiTracker.getGuiTracker(player).destroyGui(container);
                 });
+                container.timers.Add(closeTimer);
             }
+            container.display(player);
         }
 
         #endregion
@@ -435,13 +522,43 @@ namespace Oxide.Plugins
         #endregion
 
         #region commands
-        private void closeGuiConsole(ConsoleSystem.Arg arg)
+        private void closeUi(ConsoleSystem.Arg arg)
         {
             if (arg.Player() == null || arg.Args.Length < 1)
             {
                 GuiTracker.getGuiTracker(arg.Player()).destroyAllGui();
             }
             GuiTracker.getGuiTracker(arg.Player()).destroyGui(arg.Args[0]);
+        }
+
+        private void OnButtonClick(ConsoleSystem.Arg arg)
+        {
+            BasePlayer player = arg.Player();
+            if (player == null) return;
+            if (arg.Args.Length < 2) return;
+            GuiTracker tracker = GuiTracker.getGuiTracker(player);
+            GuiContainer container = tracker.getContainer(arg.Args[0]);
+            if (container == null)
+            {
+#if DEBUG
+                PrintToChat($"OnButtonClick: getContainer({arg.Args[0]}) is null!");
+#endif
+                return;
+            }
+            if(arg.Args[1] == "close")
+            {
+                tracker.destroyGui(container.name);
+                return;
+            }
+            if (!container.runCallback(arg.Args[1], player)) Puts($"OnButtonClick: {container.name} callback {arg.Args[1]} wasn't found");
+
+            if (arg.Args.Length != 3) return;
+            if (arg.Args[2] == "close") tracker.destroyGui(container.name);
+        }
+
+        private void OnGuiInput(ConsoleSystem.Arg arg)
+        {
+            PrintToChat("not implemented yet!");
         }
 
         [ChatCommand("gc")]
@@ -452,48 +569,43 @@ namespace Oxide.Plugins
                 PrintToChat(player, lang.GetMessage("noPermission", this, player.UserIDString));
                 return;
             }
+            if(args.Length == 0)
+            {
+                GuiContainer container = new GuiContainer("demo");
+                container.addPanel("demo_panel", new Rectangle(0.25f, 0.5f, 0.25f, 0.25f), GuiContainer.Layer.hud, new GuiColor(0, 1, 0, 0.5f), 1, 1, new GuiText("This is a regular panel", 30));
+                container.addPanel("demo_img", new Rectangle(0.25f, 0.25f, 0.25f, 0.25f), FadeIn: 1, FadeOut: 1, text: new GuiText("this is an image with writing on it", 30, color:new GuiColor(1,1,1,1)), imgName: "flower");
+                Action<BasePlayer> heal = (arg) => { ((BasePlayer)arg).Heal(10); };
+                container.addButton("demo_healButton", new Rectangle(0.5f, 0.5f, 0.25f, 0.25f), null, 1, new GuiText("heal me", 40), heal, false, false, "flower");
+                Action<BasePlayer> hurt = (arg) => { ((BasePlayer)arg).Hurt(10); };
+                container.addButton("demo_hurtButton", new Rectangle(0.5f, 0.25f, 0.25f, 0.25f), new GuiColor(1, 0, 0, 0.5f), 1, new GuiText("hurt me", 40), hurt);
+                container.addButton("close", new Rectangle(0.1f, 0.1f, 0.1f, 0.1f), new GuiColor("red"), 1, new GuiText("close", 50));
+
+                container.addPanel("layer1", new Rectangle(1400, 800, 300, 100, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor("red"), 1, 1, new GuiText("overall", align: TextAnchor.LowerLeft));
+                container.addPanel("layer2", new Rectangle(1425, 825, 300, 100, 1920, 1080, true), GuiContainer.Layer.overlay, new GuiColor("yellow"), 1, 1, new GuiText("overlay", align: TextAnchor.LowerLeft));
+                container.addPanel("layer3", new Rectangle(1450, 850, 300, 100, 1920, 1080, true), GuiContainer.Layer.menu, new GuiColor("green"), 1, 1, new GuiText("menu", align: TextAnchor.LowerLeft));
+                container.addPanel("layer4", new Rectangle(1475, 875, 300, 100, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("blue"), 1, 1, new GuiText("hud", align: TextAnchor.LowerLeft));
+                container.addPanel("layer5", new Rectangle(1500, 900, 300, 100, 1920, 1080, true), GuiContainer.Layer.under, new GuiColor("purple"), 1, 1, new GuiText("under", align: TextAnchor.LowerLeft));
+                container.addPanel("layers_label", new Rectangle(1400, 775, 300, 100, 1920, 1080, true), GUICreator.GuiContainer.Layer.overall, null, 1, 1, new GuiText("Available layers:", 20));
+
+                container.display(player);
+
+                customGameTip(player, "This is a custom gametip!", 5);
+                return;
+            }
             try
             {
                 switch (args[0])
                 {
                     case "panel":
-                        GuiContainer container = new GuiContainer();
+                        GuiContainer container = new GuiContainer("panelTest");
                         container.addPlainPanel("panelTest", new Rectangle(0.25f, 0.25f, 0.5f, 0.5f), GuiContainer.Layer.hud, new GuiColor(args[1]), 1f, 1f);
-                        container.addPlainButton("panelTest_button", new Rectangle(0.25f, 0.25f, 0.15f, 0.05f), GuiContainer.Layer.hud, "gc.closeui panelTest", panelColor: new GuiColor("red"), FadeIn: 1f, text: "close", fontSize: 10, CursorEnabled: true);
+                        container.addPlainButton("close", new Rectangle(0.25f, 0.25f, 0.15f, 0.05f), new GuiColor("red"), 1f,new GuiText("close", 10));
                         container.display(player);
                         break;
-
-                    case "text":
-                        GuiContainer container1 = new GuiContainer();
-                        container1.addPanel("textTest", new Rectangle(0.25f, 0.25f, 0.5f, 0.5f), FadeIn: 1f, FadeOut: 2f, text: "test", fontSize: 40, imgName: null);
-                        container1.addPlainButton("textTest_button", new Rectangle(0.25f, 0.25f, 0.15f, 0.05f), GuiContainer.Layer.hud, "gc.closeui textTest", panelColor: new GuiColor(255, 0, 0, 1), FadeIn: 1f, text: "close", fontSize: 10, CursorEnabled: true);
-                        container1.display(player);
-                        break;
-
-                    case "img":
-                        GuiContainer container2 = new GuiContainer();
-                        container2.addPanel("imgTest", new Rectangle(0.25f, 0.25f, 0.5f, 0.5f), FadeIn: 1f, FadeOut: 1f, imgName: "flower");
-                        container2.addPlainButton("imgTest_button", new Rectangle(0.25f, 0.25f, 0.15f, 0.05f), GuiContainer.Layer.hud, "gc.closeui imgTest", panelColor: new GuiColor(255, 0, 0, 1), FadeIn: 1f, text: "close", fontSize: 10, CursorEnabled: true);
-                        container2.display(player);
-                        break;
-
-                    case "button":
-                        GuiContainer container3 = new GuiContainer();
-                        container3.addPlainButton("buttonTest", new Rectangle(0.25f, 0.25f, 0.5f, 0.5f), GuiContainer.Layer.hud, "gc.closeui buttonTest", new GuiColor(255, 0, 0, 0.8f), 1f, text: "close", fontSize: 40, CursorEnabled: true);
-                        container3.display(player);
-                        break;
-
-                    case "buttonImg":
-                        GuiContainer container4 = new GuiContainer();
-                        container4.addButton("buttonImgTest", new Rectangle(0.25f, 0.25f, 0.5f, 0.5f), "gc.closeui buttonImgTest",GuiContainer.Layer.menu, FadeIn: 1f, text: "close", fontSize: 40, CursorEnabled: true, imgName: "flower");
-                        GuiTracker.getGuiTracker(player).addGuiToTracker("buttonImgTest", container4);
-                        CuiHelper.AddUi(player, container4);
-                        break;
-
                     case "input":
-                        GuiContainer container5 = new GuiContainer();
-                        container5.addInput("inputTest", new Rectangle(0.25f, 0.25f, 0.5f, 0.5f), "say input:", GuiContainer.Layer.hud, new GuiColor(0, 255, 0, 1), fontSize: 30, CursorEnabled: true);
-                        container5.addPlainButton("inputTest_button", new Rectangle(0.25f, 0.25f, 0.15f, 0.05f), GuiContainer.Layer.hud, "gc.closeui inputTest", panelColor: new GuiColor(255, 0, 0, 1), FadeIn: 1f, text: "close", fontSize: 10);
+                        GuiContainer container5 = new GuiContainer("inputTest");
+                        container5.addInput("inputTest", new Rectangle(0.25f, 0.25f, 0.5f, 0.5f), "say input:", GuiContainer.Layer.hud, new GuiColor(0, 255, 0, 1),100, new GuiText("", 40), CursorEnabled: true);
+                        container5.addPlainButton("close", new Rectangle(0.25f, 0.25f, 0.15f, 0.05f), new GuiColor("red"), 1f, new GuiText("close", 10));
                         container5.display(player);
                         break;
 
@@ -531,16 +643,6 @@ namespace Oxide.Plugins
                         break;
                     case "error":
                         errorGameTip(player, args[1], 3f);
-                        break;
-                    case "layers":
-                        GuiContainer container6 = new GuiContainer();
-                        container6.addPanel("layer1", new Rectangle(1400, 800, 300, 100, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor("red"), text:"overall", align:TextAnchor.LowerLeft);
-                        container6.addPanel("layer2", new Rectangle(1425, 825, 300, 100, 1920, 1080, true), GuiContainer.Layer.overlay, new GuiColor("yellow"), text: "overlay", align: TextAnchor.LowerLeft);
-                        container6.addPanel("layer3", new Rectangle(1450, 850, 300, 100, 1920, 1080, true), GuiContainer.Layer.menu, new GuiColor("green"), text: "menu", align: TextAnchor.LowerLeft);
-                        container6.addPanel("layer4", new Rectangle(1475, 875, 300, 100, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("blue"), text: "hud", align: TextAnchor.LowerLeft);
-                        container6.addPanel("layer5", new Rectangle(1500, 900, 300, 100, 1920, 1080, true), GuiContainer.Layer.under, new GuiColor("purple"), text: "under", align: TextAnchor.LowerLeft);
-                        container6.addPlainButton("layerTest_button", new Rectangle(0.25f, 0.25f, 0.15f, 0.05f), GuiContainer.Layer.hud, "gc.closeui layer1", panelColor: new GuiColor(255, 0, 0, 1), FadeIn: 1f, text: "close", fontSize: 10, CursorEnabled: true);
-                        container6.display(player);
                         break;
                 }
             }
@@ -596,7 +698,6 @@ namespace Oxide.Plugins
         #region Localization
         Dictionary<string, string> messages = new Dictionary<string, string>()
     {
-        {"posOutput", "Player Coordinates: X:{0}, Y:{1}, Z:{2}"},
         {"noPermission", "You don't have permission to use this command!"}
     };
         #endregion
