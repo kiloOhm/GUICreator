@@ -1,13 +1,5 @@
 ﻿//#define DEBUG
 
-/*
- TODO:
- -change input over to proper callbacks
- -add parenting
- -make more prefabs
- 
- */
-
 using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
 using System;
