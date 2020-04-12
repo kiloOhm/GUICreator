@@ -32,6 +32,7 @@ namespace Oxide.Plugins
         {
             permission.RegisterPermission("gui.demo", this);
 
+            lang.RegisterMessages(messages, this);
             cmd.AddConsoleCommand("gui.close", this, nameof(closeUi));
             cmd.AddConsoleCommand("gui.input", this, nameof(OnGuiInput));
         }
