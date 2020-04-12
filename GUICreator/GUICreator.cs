@@ -8,16 +8,16 @@
  
  */
 
-using Facepunch.Extend;
 using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "OHM", "1.1.0")]
+    [Info("GUICreator", "OHM", "1.2.0")]
     [Description("GUICreator")]
     class GUICreator : RustPlugin
     {
@@ -41,7 +41,6 @@ namespace Oxide.Plugins
             permission.RegisterPermission("gui.demo", this);
 
             cmd.AddConsoleCommand("gui.close", this, nameof(closeUi));
-            cmd.AddConsoleCommand("gui.button", this, nameof(OnButtonClick));
             cmd.AddConsoleCommand("gui.input", this, nameof(OnGuiInput));
         }
 
@@ -56,7 +55,6 @@ namespace Oxide.Plugins
             registerImage("gameTipIcon", config.gameTipIcon);
             registerImage("bgTex", "https://i.imgur.com/OAa71Rt.png");
             registerImage("warning_alpha", "https://i.imgur.com/u0bNKXx.png");
-            registerImage("warning_mask", "https://i.imgur.com/bIEQ3IV.png");
             registerImage("white_cross", "https://i.imgur.com/fbwkYDj.png");
         }
 
@@ -82,6 +80,14 @@ namespace Oxide.Plugins
         object OnPlayerDeath(BasePlayer player, HitInfo info)
         {
             GuiTracker.getGuiTracker(player).destroyAllGui();
+            return null;
+        }
+
+        private object OnServerCommand(ConsoleSystem.Arg arg)
+        {
+#if DEBUG
+            PrintToChat(arg.FullString);
+#endif
             return null;
         }
 
@@ -164,34 +170,17 @@ namespace Oxide.Plugins
             public float FadeOut { get; set; }
         }
 
-        public class GuiElement:CuiElement
-        {
-            private GuiElement ParentInternal = null;
-            private List<GuiElement> Children = new List<GuiElement>();
-
-            public void setParent(GuiElement parent)
-            {
-                this.ParentInternal = parent;
-                parent.Children.Add(this);
-            }
-
-            public CuiElementContainer getChildren()
-            {
-                if (Children.Count == 0) return null;
-                CuiElementContainer output = new CuiElementContainer();
-                output.AddRange(Children);
-                return output;
-            }
-        }
-
         public class GuiContainer : CuiElementContainer
         {
+            public Plugin plugin;
             public string name;
             public List<Timer> timers = new List<Timer>();
-            private Dictionary<string, Action<BasePlayer>> callbacks = new Dictionary<string, Action<BasePlayer>>();
+            private Dictionary<string, Action<BasePlayer>> buttonCallbacks = new Dictionary<string, Action<BasePlayer>>();
+            private Dictionary<string, Action<BasePlayer, string>> inputCallbacks = new Dictionary<string, Action<BasePlayer, string>>();
 
-            public GuiContainer(string name)
+            public GuiContainer(Plugin plugin, string name)
             {
+                this.plugin = plugin;
                 this.name = name;
             }
 
@@ -208,19 +197,40 @@ namespace Oxide.Plugins
 
             public void registerCallback(string name, Action<BasePlayer> callback)
             {
-                if (callbacks.ContainsKey(name)) callbacks.Remove(name);
-                callbacks.Add(name, callback);
+                if (buttonCallbacks.ContainsKey(name)) buttonCallbacks.Remove(name);
+                buttonCallbacks.Add(name, callback);
+            }
+
+            public void registerCallback(string name, Action<BasePlayer, string> callback)
+            {
+                if (inputCallbacks.ContainsKey(name)) buttonCallbacks.Remove(name);
+                inputCallbacks.Add(name, callback);
             }
 
             public bool runCallback(string name, BasePlayer player)
             {
-                if (!callbacks.ContainsKey(name)) return false;
+                if (!buttonCallbacks.ContainsKey(name)) return false;
                 try
                 {
-                    callbacks[name](player);
+                    buttonCallbacks[name](player);
                     return true;
                 }
                 catch(Exception E)
+                {
+                    PluginInstance.Puts($"Failed to run callback: {name}, {E.Message}");
+                    return false;
+                }
+            }
+
+            public bool runCallback(string name, BasePlayer player, string input)
+            {
+                if (!inputCallbacks.ContainsKey(name)) return false;
+                try
+                {
+                    inputCallbacks[name](player, input);
+                    return true;
+                }
+                catch (Exception E)
                 {
                     PluginInstance.Puts($"Failed to run callback: {name}, {E.Message}");
                     return false;
@@ -248,30 +258,40 @@ namespace Oxide.Plugins
                 return Name;
             }
 
-            public void addPanel(string name, Rectangle rectangle, Layer layer = Layer.hud, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null)
+            public void addPanel(string name, Rectangle rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null)
             {
-                if (string.IsNullOrEmpty(name))
-                {
-                    name = "panel";
-                }
+                addPanel(name, rectangle, layers[(int)layer], panelColor, FadeIn, FadeOut, text, imgName);
+            }
+
+            public void addPanel(string name, Rectangle rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null)
+            {
+                if (string.IsNullOrEmpty(name)) name = "panel";
+                if (name == this.name) name = name + "_";
+
                 if (string.IsNullOrEmpty(imgName))
                 {
-                    this.addPlainPanel(name, rectangle, layer, panelColor, FadeIn, FadeOut);
+                    addPlainPanel(name, rectangle, parent, panelColor, FadeIn, FadeOut);
                 }
                 else
                 {
-                    this.addImage(name, rectangle, imgName, layer, panelColor, FadeIn, FadeOut);
+                   this.addImage(name, rectangle, imgName, parent, panelColor, FadeIn, FadeOut);
                 }
-                if (text != null) this.addText(name + "_txt", rectangle, layer, text, FadeIn, FadeOut);
+                if (text != null) this.addText(name + "_txt", new Rectangle(0, 0, 1, 1), text, FadeIn, FadeOut, name);
             }
 
-            public void addPlainPanel(string name, Rectangle rectangle, Layer layer = Layer.hud, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
+            public void addPlainPanel(string name, Rectangle rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
+            {
+                addPlainPanel(name, rectangle, layers[(int)layer], panelColor, FadeIn, FadeOut);
+            }
+
+            public void addPlainPanel(string name, Rectangle rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 if (string.IsNullOrEmpty(name)) name = "plainPanel";
+                if (name == this.name) name = name + "_";
 
                 this.Add(new CuiElement
                 {
-                    Parent = layers[(int)layer],
+                    Parent = parent,
                     Name = name,
                     Components =
                 {
@@ -282,13 +302,19 @@ namespace Oxide.Plugins
                 });
             }
 
-            public void addImage(string name, Rectangle rectangle, string imgName, Layer layer = Layer.hud, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
+            public void addImage(string name, Rectangle rectangle, string imgName, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
+            {
+                addImage(name, rectangle, imgName, layers[(int)layer], panelColor, FadeIn, FadeOut);
+            }
+
+            public void addImage(string name, Rectangle rectangle, string imgName, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 if (string.IsNullOrEmpty(name)) name = "image";
+                if (name == this.name) name = name + "_";
 
                 this.Add(new CuiElement
                 {
-                    Parent = layers[(int)layer],
+                    Parent = parent,
                     Name = name,
                     Components =
                 {
@@ -299,13 +325,19 @@ namespace Oxide.Plugins
                 });
             }
 
-            public void addText(string name, Rectangle rectangle, Layer layer = Layer.hud, GuiText text = null, float FadeIn = 0, float FadeOut = 0)
+            public void addText(string name, Rectangle rectangle, Layer layer, GuiText text = null, float FadeIn = 0, float FadeOut = 0)
+            {
+                addText(name, rectangle, text, FadeIn, FadeOut, layers[(int)layer]);
+            }
+
+            public void addText(string name, Rectangle rectangle, GuiText text = null, float FadeIn = 0, float FadeOut = 0, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "text";
+                if (name == this.name) name = name + "_";
 
                 this.Add(new CuiElement
                 {
-                    Parent = layers[(int)layer],
+                    Parent = parent,
                     Name = name,
                     Components =
                 {
@@ -316,26 +348,50 @@ namespace Oxide.Plugins
                 });
             }
 
-            public void addButton(string name, Rectangle rectangle, GuiColor panelColor = null, float FadeIn = 0, GuiText text = null, Action<BasePlayer> callback = null, bool close = false, bool CursorEnabled = true, string imgName = null, Layer layer = Layer.hud)
+            public void addButton(string name, Rectangle rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, GuiText text = null, Action<BasePlayer> callback = null, string close = null, bool CursorEnabled = true, string imgName = null)
             {
-                if (string.IsNullOrEmpty(name)) name = "button";
-                if (layer == Layer.under) layer = Layer.hud;
-
-                this.addPlainButton(name, rectangle, panelColor, FadeIn, text, callback, close, CursorEnabled, layer);
-
-                if (imgName != null) this.addImage(name + "_img", rectangle, imgName, layer + 1, null, FadeIn);
+                addButton(name, rectangle, panelColor, FadeIn, text, callback, close, CursorEnabled, imgName, layers[(int)layer]);
             }
 
-            public void addPlainButton(string name, Rectangle rectangle, GuiColor panelColor = null, float FadeIn = 0, GuiText text = null, Action<BasePlayer> callback = null, bool close = false, bool CursorEnabled = true, Layer layer = Layer.hud)
+            public void addButton(string name, Rectangle rectangle, GuiColor panelColor = null, float FadeIn = 0, GuiText text = null, Action<BasePlayer> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, string parent = "Hud")
+            {
+                if (string.IsNullOrEmpty(name)) name = "button";
+                if (name == this.name) name = name + "_";
+
+                if (imgName != null)
+                {
+                    this.addImage(name, rectangle, imgName, parent, null, FadeIn);
+                    this.addPlainButton(name + "_btn", new Rectangle(0, 0, 1, 1), panelColor, FadeIn, text, callback, close, CursorEnabled, name);
+                }
+                else
+                {
+                    this.addPlainButton(name, rectangle, panelColor, FadeIn, text, callback, close, CursorEnabled, parent);
+                }
+            }
+
+            public void addPlainButton(string name, Rectangle rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, GuiText text = null, Action<BasePlayer> callback = null, string close = null, bool CursorEnabled = true)
+            {
+                addPlainButton(name, rectangle, panelColor, FadeIn, text, callback, close, CursorEnabled, layers[(int)layer]);
+            }
+
+            public void addPlainButton(string name, Rectangle rectangle, GuiColor panelColor = null, float FadeIn = 0, GuiText text = null, Action<BasePlayer> callback = null, string close = null, bool CursorEnabled = true, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "plainButton";
+                if (name == this.name) name = name + "_";
+
+                StringBuilder closeString = new StringBuilder("");
+                if (close != null)
+                {
+                    closeString.Append(" close ");
+                    closeString.Append(close);
+                }
 
                 this.Add(new CuiButton()
                 {
-                    Button = { Command = $"gui.button {this.name} {name}{(close?" close":"")}", FadeIn = FadeIn, Color = (panelColor != null) ? panelColor.getColorString() : "0 0 0 0" },
+                    Button = { Command = $"gui.input button {plugin.Name} {this.name} {name}{closeString.ToString()}", FadeIn = FadeIn, Color = (panelColor != null) ? panelColor.getColorString() : "0 0 0 0" },
                     RectTransform = { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax },
                     Text = { Text = text.text, Align = text.align, FontSize = text.fontSize, FadeIn = FadeIn, Color = text.color.getColorString() },
-                }, layers[(int)layer], name);
+                }, parent, name);
 
                 if (CursorEnabled)
                 {
@@ -352,20 +408,47 @@ namespace Oxide.Plugins
                 if (callback != null) this.registerCallback(name, callback);
             }
 
-            public void addInput(string name, Rectangle rectangle, string command, Layer layer = Layer.hud, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
+            public void addInput(string name, Rectangle rectangle, Action<BasePlayer,string> callback, Layer layer, string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
+            {
+                addInput(name, rectangle, callback, layers[(int)layer], close, panelColor, charLimit, text, FadeIn, FadeOut, isPassword, CursorEnabled, imgName);
+            }
+
+            public void addInput(string name, Rectangle rectangle, Action<BasePlayer, string> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
             {
                 if (string.IsNullOrEmpty(name)) name = "input";
-                if (layer == Layer.under) layer = Layer.hud;
+                if (name == this.name) name = name + "_";
 
-                this.Add(new CuiInputField()
+                StringBuilder closeString = new StringBuilder("");
+                if (close != null)
                 {
-                    InputField = { Align = text.align, FontSize = text.fontSize, Color = text.color.getColorString(), Command = command, CharsLimit = charLimit, IsPassword = isPassword },
-                    RectTransform = { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax },
-                    CursorEnabled = CursorEnabled,
-                    FadeOut = FadeOut
-                }, layers[(int)layer], name);
+                    closeString.Append(" close ");
+                    closeString.Append(close);
+                }
 
-                if (imgName != null) this.addImage(name + "_img", rectangle, imgName, layer - 1, panelColor, FadeIn, FadeOut);
+                if (imgName != null || panelColor != null)
+                {
+                    this.addPanel(name, rectangle, parent, panelColor, FadeIn, FadeOut, null, imgName);
+
+                    this.Add(new CuiInputField()
+                    {
+                        InputField = { Align = text.align, FontSize = text.fontSize, Color = text.color.getColorString(), Command = $"gui.input text {plugin.Name} {this.name} {name}{closeString.ToString()}", CharsLimit = charLimit, IsPassword = isPassword },
+                        RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1" },
+                        CursorEnabled = CursorEnabled,
+                        FadeOut = FadeOut
+                    }, name, name + "_ipt");
+                }
+                else
+                {
+                    this.Add(new CuiInputField()
+                    {
+                        InputField = { Align = text.align, FontSize = text.fontSize, Color = text.color.getColorString(), Command = $"gui.input text {plugin.Name} {this.name} {name}{closeString.ToString()}", CharsLimit = charLimit, IsPassword = isPassword },
+                        RectTransform = { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax },
+                        CursorEnabled = CursorEnabled,
+                        FadeOut = FadeOut
+                    }, parent, name);
+                }
+
+                if (callback != null) this.registerCallback(name, callback);
             }
         }
 
@@ -389,10 +472,11 @@ namespace Oxide.Plugins
                 return output;
             }
 
-            public GuiContainer getContainer(string name)
+            public GuiContainer getContainer(Plugin plugin, string name)
             {
                 foreach(GuiContainer container in activeGuiContainers)
                 {
+                    if (container.plugin != plugin) continue;
                     if (container.name == name) return container;
                 }
                 return null;
@@ -406,47 +490,46 @@ namespace Oxide.Plugins
                 activeGuiContainers.Add(container);
             }
 
-            public void destroyGui(GuiContainer container)
+            public void destroyGui(Plugin plugin, GuiContainer container)
             {
                 if (activeGuiContainers.Contains(container))
                 {
-                    foreach (CuiElement element in container)
-                    {
-                        CuiHelper.DestroyUi(player, element.Name);
-                    }
-#if DEBUG
-                    PluginInstance.PrintToChat($"cloing container.name: {container.name}");
-#endif
-                    foreach (Timer timer in container.timers)
-                    {
-                        timer.Destroy();
-#if DEBUG
-                        if (timer.Destroyed)
-                        {
-                            PluginInstance.PrintToChat($"{container.name} timer destroyed!");
-                        }
-#endif
-                    }
-
-                    activeGuiContainers.Remove(container);
-                    //if (activeGuiElements.Count == 0) Destroy(this);
+                    destroyGui(plugin, container.name);
                 }
                 else PluginInstance.Puts($"destroyGui(container.name: {container.name}): no GUI containers found");
             }
 
-            public void destroyGui(string name)
+            public void destroyGui(Plugin plugin, string name)
             {
-                GuiContainer container = null;
-                foreach(GuiContainer cont in activeGuiContainers)
+                GuiContainer container = getContainer(plugin, name);
+                if(container != null)
                 {
-                    if (cont.name == name) container = cont;
+                    foreach(CuiElement element in container)
+                    {
+                        destroyGui(plugin, element.Name);
+                    }
+                    foreach (Timer timer in container.timers)
+                    {
+                        timer.Destroy();
+                    }
+                    activeGuiContainers.Remove(container);
                 }
-                if(container == null)
+                else
                 {
-                    PluginInstance.Puts($"destroyGui({name}): no GUI containers found");
-                    return;
+                    foreach(GuiContainer cont in activeGuiContainers)
+                    {
+                        if (cont.plugin != plugin) continue;
+                        foreach (CuiElement element in cont)
+                        {
+                            if (element.Parent == name)
+                            {
+                                CuiHelper.DestroyUi(player, element.Name);
+                            }
+                        }
+                        CuiHelper.DestroyUi(player, name);
+                    }
+                    
                 }
-                destroyGui(container);
             }
 
             public void destroyAllGui()
@@ -471,13 +554,13 @@ namespace Oxide.Plugins
 
         #region API
 
-        public enum gametipType {gametip, warning1, warning2, error}
+        public enum gametipType {gametip, warning, error}
 
         public void customGameTip(BasePlayer player, string text, float duration = 0, gametipType type = gametipType.gametip)
         {
-            GuiTracker.getGuiTracker(player).destroyGui("gameTip");
+            GuiTracker.getGuiTracker(player).destroyGui(this, "gameTip");
 
-            GuiContainer container = new GuiContainer("gameTip");
+            GuiContainer container = new GuiContainer(this, "gameTip");
             switch(type)
             {
                 case gametipType.gametip:
@@ -485,15 +568,10 @@ namespace Oxide.Plugins
                     container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
                     container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "gameTipIcon", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
                     break;
-                case gametipType.warning1:
+                case gametipType.warning:
                     container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("#DED502F0"), 0.5f, 1);
                     container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#000000D9")), 0.5f, 1);
                     container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "warning_alpha", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
-                    break;
-                case gametipType.warning2:
-                    container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.under, new GuiColor("#DED502F0"), 0.5f, 1);
-                    container.addImage("gametip_mask", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "warning_mask", GuiContainer.Layer.hud, new GuiColor("#FFFFFFFF"), 0.5f, 1);
-                    container.addText("gametip_txt", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
                     break;
                 case gametipType.error:
                     container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.hud, new GuiColor("#BB0000F0"), 0.5f, 1);
@@ -506,7 +584,7 @@ namespace Oxide.Plugins
             {
                 Timer closeTimer = timer.Once(duration, () =>
                 {
-                    GuiTracker.getGuiTracker(player).destroyGui(container);
+                    GuiTracker.getGuiTracker(player).destroyGui(this, container);
                 });
                 container.timers.Add(closeTimer);
             }
@@ -527,44 +605,67 @@ namespace Oxide.Plugins
         #region commands
         private void closeUi(ConsoleSystem.Arg arg)
         {
-            if (arg.Player() == null || arg.Args.Length < 1)
-            {
-                GuiTracker.getGuiTracker(arg.Player()).destroyAllGui();
-            }
-            GuiTracker.getGuiTracker(arg.Player()).destroyGui(arg.Args[0]);
-        }
-
-        private void OnButtonClick(ConsoleSystem.Arg arg)
-        {
-            BasePlayer player = arg.Player();
-            if (player == null) return;
-            if (arg.Args.Length < 2) return;
-            GuiTracker tracker = GuiTracker.getGuiTracker(player);
-            GuiContainer container = tracker.getContainer(arg.Args[0]);
-            if (container == null)
-            {
-#if DEBUG
-                PrintToChat($"OnButtonClick: getContainer({arg.Args[0]}) is null!");
-#endif
-                return;
-            }
-            if(arg.Args[1] == "close")
-            {
-                tracker.destroyGui(container.name);
-                return;
-            }
-            if (!container.runCallback(arg.Args[1], player)) Puts($"OnButtonClick: {container.name} callback {arg.Args[1]} wasn't found");
-
-            if (arg.Args.Length != 3) return;
-            if (arg.Args[2] == "close") tracker.destroyGui(container.name);
+            GuiTracker.getGuiTracker(arg.Player()).destroyAllGui();
         }
 
         private void OnGuiInput(ConsoleSystem.Arg arg)
         {
-            PrintToChat("not implemented yet!");
+            //           0           1      2             3          4     5           6
+            //gui.button button/text plugin containerName inputName close elementName inputText
+
+            BasePlayer player = arg.Player();
+            if (player == null) return;
+            if (arg.Args.Length < 3) return;
+            bool input = false;
+            if (arg.Args[0] == "text") input = true;
+            GuiTracker tracker = GuiTracker.getGuiTracker(player);
+            Plugin plugin = Manager.GetPlugin(arg.Args[1]);
+            GuiContainer container = tracker.getContainer(plugin, arg.Args[2]);
+            if (container == null)
+            {
+                Puts($"OnGuiInput: getContainer({arg.Args[2]}) is null!");
+#if DEBUG
+                PrintToChat($"OnGuiInput: getContainer({arg.Args[2]}) is null!");
+#endif
+                return;
+            }
+            if(arg.Args[3] == "close")
+            {
+                tracker.destroyGui(plugin, container.name);
+                return;
+            }
+
+            //execute callback if button
+            if(!input)
+            {
+                if (!container.runCallback(arg.Args[3], player)) Puts($"OnGuiInput: {container.name} callback {arg.Args[3]} wasn't found");
+            }
+            else
+            {
+                if(arg.Args.Length == 5)
+                {
+                    //execute callback if input
+                    if (!container.runCallback(arg.Args[3], player, arg.Args[4])) Puts($"OnGuiInput: {container.name} callback {arg.Args[3]} wasn't found");
+                }
+                else if (arg.Args.Length > 6)
+                {
+                    if (arg.Args[4] == "close")
+                    {
+                        if (arg.Args.Length >= 6)
+                        {
+                            tracker.destroyGui(plugin, arg.Args[5]);
+                        }
+                    }
+                    //execute callback if input & close
+                    if (!container.runCallback(arg.Args[3], player, arg.Args[6])) Puts($"OnGuiInput: {container.name} callback {arg.Args[3]} wasn't found");
+                }
+            }
+
+            
+            
         }
 
-        [ChatCommand("gc")]
+        [ChatCommand("guidemo")]
         private void gcCommand(BasePlayer player, string command, string[] args)
         {
             if (!permission.UserHasPermission(player.UserIDString, "gui.demo"))
@@ -574,74 +675,35 @@ namespace Oxide.Plugins
             }
             if(args.Length == 0)
             {
-                GuiContainer container = new GuiContainer("demo");
+                GuiContainer container = new GuiContainer(this, "demo");
                 container.addPanel("demo_panel", new Rectangle(0.25f, 0.5f, 0.25f, 0.25f), GuiContainer.Layer.hud, new GuiColor(0, 1, 0, 0.5f), 1, 1, new GuiText("This is a regular panel", 30));
                 container.addPanel("demo_img", new Rectangle(0.25f, 0.25f, 0.25f, 0.25f), FadeIn: 1, FadeOut: 1, text: new GuiText("this is an image with writing on it", 30, color:new GuiColor(1,1,1,1)), imgName: "flower");
                 Action<BasePlayer> heal = (arg) => { ((BasePlayer)arg).Heal(10); };
-                container.addButton("demo_healButton", new Rectangle(0.5f, 0.5f, 0.25f, 0.25f), null, 1, new GuiText("heal me", 40), heal, false, false, "flower");
+                container.addButton("demo_healButton", new Rectangle(0.5f, 0.5f, 0.25f, 0.25f), GuiContainer.Layer.hud, null, 1, new GuiText("heal me", 40), heal, null, false, "flower");
                 Action<BasePlayer> hurt = (arg) => { ((BasePlayer)arg).Hurt(10); };
                 container.addButton("demo_hurtButton", new Rectangle(0.5f, 0.25f, 0.25f, 0.25f), new GuiColor(1, 0, 0, 0.5f), 1, new GuiText("hurt me", 40), hurt);
-                container.addButton("close", new Rectangle(0.1f, 0.1f, 0.1f, 0.1f), new GuiColor("red"), 1, new GuiText("close", 50));
+                container.addText("demo_inputLabel", new Rectangle(0.375f, 0.85f, 0.25f, 0.1f), new GuiText("Print to chat:", 50), 1, 1);
+                Action<BasePlayer, string> inputCallback = (bPlayer, input) => { PrintToChat(bPlayer, input); };
+                container.addInput("demo_input", new Rectangle(0.375f, 0.75f, 0.25f, 0.1f), inputCallback, GuiContainer.Layer.hud, null, new GuiColor("white"), 100, new GuiText("", 50), 1, 1);
 
                 container.addPanel("layer1", new Rectangle(1400, 800, 300, 100, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor("red"), 1, 1, new GuiText("overall", align: TextAnchor.LowerLeft));
+                container.addPanel("layers_label", new Rectangle(0,0,1,1), "layer1", null, 1, 1, new GuiText("Available layers:", 20, align:TextAnchor.UpperLeft));
                 container.addPanel("layer2", new Rectangle(1425, 825, 300, 100, 1920, 1080, true), GuiContainer.Layer.overlay, new GuiColor("yellow"), 1, 1, new GuiText("overlay", align: TextAnchor.LowerLeft));
                 container.addPanel("layer3", new Rectangle(1450, 850, 300, 100, 1920, 1080, true), GuiContainer.Layer.menu, new GuiColor("green"), 1, 1, new GuiText("menu", align: TextAnchor.LowerLeft));
                 container.addPanel("layer4", new Rectangle(1475, 875, 300, 100, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("blue"), 1, 1, new GuiText("hud", align: TextAnchor.LowerLeft));
                 container.addPanel("layer5", new Rectangle(1500, 900, 300, 100, 1920, 1080, true), GuiContainer.Layer.under, new GuiColor("purple"), 1, 1, new GuiText("under", align: TextAnchor.LowerLeft));
-                container.addPanel("layers_label", new Rectangle(1400, 775, 300, 100, 1920, 1080, true), GUICreator.GuiContainer.Layer.overall, null, 1, 1, new GuiText("Available layers:", 20));
+
+                container.addButton("close", new Rectangle(0.1f, 0.1f, 0.1f, 0.1f), new GuiColor("red"), 1, new GuiText("close", 50));
 
                 container.display(player);
 
                 customGameTip(player, "This is a custom gametip!", 5);
                 return;
             }
-            try
+            else if(args.Length >= 3)
             {
-                switch (args[0])
-                {
-                    case "panel":
-                        GuiContainer container = new GuiContainer("panelTest");
-                        container.addPlainPanel("panelTest", new Rectangle(0.25f, 0.25f, 0.5f, 0.5f), GuiContainer.Layer.hud, new GuiColor(args[1]), 1f, 1f);
-                        container.addPlainButton("close", new Rectangle(0.25f, 0.25f, 0.15f, 0.05f), new GuiColor("red"), 1f,new GuiText("close", 10));
-                        container.display(player);
-                        break;
-                    case "input":
-                        GuiContainer container5 = new GuiContainer("inputTest");
-                        container5.addInput("inputTest", new Rectangle(0.25f, 0.25f, 0.5f, 0.5f), "say input:", GuiContainer.Layer.hud, new GuiColor(0, 255, 0, 1),100, new GuiText("", 40), CursorEnabled: true);
-                        container5.addPlainButton("close", new Rectangle(0.25f, 0.25f, 0.15f, 0.05f), new GuiColor("red"), 1f, new GuiText("close", 10));
-                        container5.display(player);
-                        break;
-
-                    case "raw":
-                        CuiElementContainer rawContainer = new CuiElementContainer();
-                        rawContainer.Add(new CuiPanel()
-                        {
-                            RectTransform = { AnchorMin = "0.25 0.25", AnchorMax = "0.75 0.75" },
-                            Image = { Color = "0 0 0 0.5", Sprite = "assets/content/materials/highlight.png", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" },
-                            FadeOut = 2
-                        }, new CuiElement().Parent, "rawTest_panel");
-                        rawContainer.Add(new CuiLabel()
-                        {
-                            RectTransform = { AnchorMin = "0.25 0.25", AnchorMax = "0.75 0.75" },
-                            Text = { Text = "test", Align = TextAnchor.MiddleCenter, FontSize = 50 },
-                            FadeOut = 2
-                        }, new CuiElement().Parent, "rawTest_text");
-                        CuiHelper.AddUi(player, rawContainer);
-
-                        timer.Once(2f, () =>
-                        {
-                            CuiHelper.DestroyUi(player, "rawTest_panel");
-                            CuiHelper.DestroyUi(player, "rawTest_text");
-                        });
-                        break;
-
-                    case "gametip":
-                        customGameTip(player, args[2], 3f, (gametipType)Enum.Parse(typeof(gametipType), args[1]));
-                        break;
-                }
+                if(args[0] == "gametip") customGameTip(player, args[2], 3f, (gametipType)Enum.Parse(typeof(gametipType), args[1]));
             }
-            catch (Exception E) { }
-
         }
         #endregion
 
