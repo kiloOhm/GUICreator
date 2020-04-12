@@ -1,5 +1,14 @@
 ﻿//#define DEBUG
 
+/*
+ TODO:
+ -change input over to proper callbacks
+ -add parenting
+ -make more prefabs
+ 
+ */
+
+using Facepunch.Extend;
 using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
 using System;
@@ -29,11 +38,11 @@ namespace Oxide.Plugins
         #region oxide hooks
         void Init()
         {
-            permission.RegisterPermission("GC.use", this);
+            permission.RegisterPermission("gui.demo", this);
 
-            cmd.AddConsoleCommand("gc.close", this, nameof(closeUi));
-            cmd.AddConsoleCommand("gc.button", this, nameof(OnButtonClick));
-            cmd.AddConsoleCommand("gc.input", this, nameof(OnGuiInput));
+            cmd.AddConsoleCommand("gui.close", this, nameof(closeUi));
+            cmd.AddConsoleCommand("gui.button", this, nameof(OnButtonClick));
+            cmd.AddConsoleCommand("gui.input", this, nameof(OnGuiInput));
         }
 
         void OnServerInitialized()
@@ -62,6 +71,18 @@ namespace Oxide.Plugins
         void OnPlayerDisconnected(BasePlayer player, string reason)
         {
             GuiTracker.getGuiTracker(player).destroyAllGui();
+        }
+
+        object OnPlayerWound(BasePlayer player)
+        {
+            GuiTracker.getGuiTracker(player).destroyAllGui();
+            return null;
+        }
+
+        object OnPlayerDeath(BasePlayer player, HitInfo info)
+        {
+            GuiTracker.getGuiTracker(player).destroyAllGui();
+            return null;
         }
 
         #endregion
@@ -141,6 +162,26 @@ namespace Oxide.Plugins
             public CuiRectTransformComponent RectTransform { get; } = new CuiRectTransformComponent();
             public bool CursorEnabled { get; set; }
             public float FadeOut { get; set; }
+        }
+
+        public class GuiElement:CuiElement
+        {
+            private GuiElement ParentInternal = null;
+            private List<GuiElement> Children = new List<GuiElement>();
+
+            public void setParent(GuiElement parent)
+            {
+                this.ParentInternal = parent;
+                parent.Children.Add(this);
+            }
+
+            public CuiElementContainer getChildren()
+            {
+                if (Children.Count == 0) return null;
+                CuiElementContainer output = new CuiElementContainer();
+                output.AddRange(Children);
+                return output;
+            }
         }
 
         public class GuiContainer : CuiElementContainer
@@ -291,7 +332,7 @@ namespace Oxide.Plugins
 
                 this.Add(new CuiButton()
                 {
-                    Button = { Command = $"gc.button {this.name} {name}{(close?" close":"")}", FadeIn = FadeIn, Color = (panelColor != null) ? panelColor.getColorString() : "0 0 0 0" },
+                    Button = { Command = $"gui.button {this.name} {name}{(close?" close":"")}", FadeIn = FadeIn, Color = (panelColor != null) ? panelColor.getColorString() : "0 0 0 0" },
                     RectTransform = { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax },
                     Text = { Text = text.text, Align = text.align, FontSize = text.fontSize, FadeIn = FadeIn, Color = text.color.getColorString() },
                 }, layers[(int)layer], name);
@@ -430,74 +471,36 @@ namespace Oxide.Plugins
 
         #region API
 
-        public void customGameTip(BasePlayer player, string text, float duration = 0)
+        public enum gametipType {gametip, warning1, warning2, error}
+
+        public void customGameTip(BasePlayer player, string text, float duration = 0, gametipType type = gametipType.gametip)
         {
             GuiTracker.getGuiTracker(player).destroyGui("gameTip");
 
             GuiContainer container = new GuiContainer("gameTip");
-            container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.hud, new GuiColor("#25639BF0"), 0.5f, 1);
-            container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
-            container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "gameTipIcon", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
-
-            if (duration != 0)
+            switch(type)
             {
-                Timer closeTimer = timer.Once(duration, () =>
-                {
-                    GuiTracker.getGuiTracker(player).destroyGui(container);
-                });
-                container.timers.Add(closeTimer);
+                case gametipType.gametip:
+                    container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.hud, new GuiColor("#25639BF0"), 0.5f, 1);
+                    container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
+                    container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "gameTipIcon", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
+                    break;
+                case gametipType.warning1:
+                    container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("#DED502F0"), 0.5f, 1);
+                    container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#000000D9")), 0.5f, 1);
+                    container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "warning_alpha", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
+                    break;
+                case gametipType.warning2:
+                    container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.under, new GuiColor("#DED502F0"), 0.5f, 1);
+                    container.addImage("gametip_mask", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "warning_mask", GuiContainer.Layer.hud, new GuiColor("#FFFFFFFF"), 0.5f, 1);
+                    container.addText("gametip_txt", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
+                    break;
+                case gametipType.error:
+                    container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.hud, new GuiColor("#BB0000F0"), 0.5f, 1);
+                    container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
+                    container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "white_cross", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
+                    break;
             }
-            container.display(player);
-        }
-
-        public void warningGameTip1(BasePlayer player, string text, float duration = 0)
-        {
-            GuiTracker.getGuiTracker(player).destroyGui("gameTip");
-
-            GuiContainer container = new GuiContainer("gameTip");
-            container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("#DED502F0"), 0.5f, 1);
-            container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#000000D9")), 0.5f, 1);
-            container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "warning_alpha", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
-
-            if (duration != 0)
-            {
-                Timer closeTimer = timer.Once(duration, () =>
-                {
-                    GuiTracker.getGuiTracker(player).destroyGui(container);
-                });
-                container.timers.Add(closeTimer);
-            }
-            container.display(player);
-        }
-
-        public void warningGameTip2(BasePlayer player, string text, float duration = 0)
-        {
-            GuiTracker.getGuiTracker(player).destroyGui("gameTip");
-
-            GuiContainer container = new GuiContainer("gameTip");
-            container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("#DED502F0"), 0.5f, 1);
-            container.addImage("gametip_mask", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "warning_mask", GuiContainer.Layer.hud, new GuiColor("#FFFFFFFF"), 0.5f, 1);
-            container.addText("gametip_txt", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
-
-            if (duration != 0)
-            {
-                Timer closeTimer = timer.Once(duration, () =>
-                {
-                    GuiTracker.getGuiTracker(player).destroyGui(container);
-                });
-                container.timers.Add(closeTimer);
-            }
-            container.display(player);
-        }
-
-        public void errorGameTip(BasePlayer player, string text, float duration = 0)
-        {
-            GuiTracker.getGuiTracker(player).destroyGui("gameTip");
-
-            GuiContainer container = new GuiContainer("gameTip");
-            container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.hud, new GuiColor("#BB0000F0"), 0.5f, 1);
-            container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
-            container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "white_cross", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
 
             if (duration != 0)
             {
@@ -564,7 +567,7 @@ namespace Oxide.Plugins
         [ChatCommand("gc")]
         private void gcCommand(BasePlayer player, string command, string[] args)
         {
-            if (!permission.UserHasPermission(player.UserIDString, "GUICreator.use"))
+            if (!permission.UserHasPermission(player.UserIDString, "gui.demo"))
             {
                 PrintToChat(player, lang.GetMessage("noPermission", this, player.UserIDString));
                 return;
@@ -633,16 +636,7 @@ namespace Oxide.Plugins
                         break;
 
                     case "gametip":
-                        customGameTip(player, args[1], 3f);
-                        break;
-                    case "warning1":
-                        warningGameTip1(player, args[1], 3f);
-                        break;
-                    case "warning2":
-                        warningGameTip2(player, args[1], 3f);
-                        break;
-                    case "error":
-                        errorGameTip(player, args[1], 3f);
+                        customGameTip(player, args[2], 3f, (gametipType)Enum.Parse(typeof(gametipType), args[1]));
                         break;
                 }
             }
