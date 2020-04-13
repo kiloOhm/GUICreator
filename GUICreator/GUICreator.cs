@@ -557,19 +557,19 @@ namespace Oxide.Plugins
             switch(type)
             {
                 case gametipType.gametip:
-                    container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.hud, new GuiColor("#25639BF0"), 0.5f, 1);
-                    container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
-                    container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "gameTipIcon", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
+                    container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.menu, new GuiColor("#25639BF0"), 0.5f, 1);
+                    container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.menu, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
+                    container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "gameTipIcon", GuiContainer.Layer.menu, new GuiColor("#FFFFFFD9"), 0.5f, 1);
                     break;
                 case gametipType.warning:
-                    container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("#DED502F0"), 0.5f, 1);
-                    container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#000000D9")), 0.5f, 1);
-                    container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "warning_alpha", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
+                    container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.menu, new GuiColor("#DED502F0"), 0.5f, 1);
+                    container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.menu, new GuiText(text, 20, new GuiColor("#000000D9")), 0.5f, 1);
+                    container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "warning_alpha", GuiContainer.Layer.menu, new GuiColor("#FFFFFFD9"), 0.5f, 1);
                     break;
                 case gametipType.error:
-                    container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.hud, new GuiColor("#BB0000F0"), 0.5f, 1);
-                    container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.hud, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
-                    container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "white_cross", GuiContainer.Layer.hud, new GuiColor("#FFFFFFD9"), 0.5f, 1);
+                    container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.menu, new GuiColor("#BB0000F0"), 0.5f, 1);
+                    container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.menu, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
+                    container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "white_cross", GuiContainer.Layer.menu, new GuiColor("#FFFFFFD9"), 0.5f, 1);
                     break;
             }
 
@@ -632,6 +632,13 @@ namespace Oxide.Plugins
             if(!input)
             {
                 if (!container.runCallback(arg.Args[3], player)) Puts($"OnGuiInput: {container.name} callback {arg.Args[3]} wasn't found");
+                if(arg.Args.Length == 6)
+                {
+                    if (arg.Args[4] == "close")
+                    {
+                            tracker.destroyGui(plugin, arg.Args[5]);
+                    }
+                }
             }
             else
             {
@@ -640,7 +647,7 @@ namespace Oxide.Plugins
                     //execute callback if input
                     if (!container.runCallback(arg.Args[3], player, arg.Args[4])) Puts($"OnGuiInput: {container.name} callback {arg.Args[3]} wasn't found");
                 }
-                else if (arg.Args.Length > 6)
+                else if (arg.Args.Length >= 6)
                 {
                     if (arg.Args[4] == "close")
                     {
@@ -686,7 +693,7 @@ namespace Oxide.Plugins
                 container.addPanel("layer4", new Rectangle(1475, 875, 300, 100, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("blue"), 1, 1, new GuiText("hud", align: TextAnchor.LowerLeft));
                 container.addPanel("layer5", new Rectangle(1500, 900, 300, 100, 1920, 1080, true), GuiContainer.Layer.under, new GuiColor("purple"), 1, 1, new GuiText("under", align: TextAnchor.LowerLeft));
 
-                container.addButton("close", new Rectangle(0.1f, 0.1f, 0.1f, 0.1f), new GuiColor("red"), 1, new GuiText("close", 50));
+                container.addButton("demo_close", new Rectangle(0.1f, 0.1f, 0.1f, 0.1f), new GuiColor("red"), 1, new GuiText("close", 50), null, "demo");
 
                 container.display(player);
 
