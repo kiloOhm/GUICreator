@@ -104,6 +104,7 @@ Classes:
 		destroyAllGui(Plugin plugin) - destroys all GUI sent by the specified plugin.
 
 API Methods:
+	
 	customGameTip(BasePlayer player, string text, float duration = 0, gametipType type = gametipType.gametip)
 	- displays a gametip-like popup above the players inventory. there are three types: gametip(default), warning, error
 	  calling gametips destroys any gametip which was previously there. leaving duration on 0 is not recommended!
@@ -115,6 +116,7 @@ API Methods:
 	string getItemIcon(string shortname) - returns raw image data of an item icon for use with addRawImage
 
 Commands:
+
 	Console:
 		gui.close - closes all gui sent by this plugin on a client.
 		gui.input - used to call button/input callbacks. can be used manually for debugging
