@@ -1,21 +1,5 @@
 ﻿//#define DEBUG
 
-//added plugin-secure images
-
-//added container parenting
-
-//reworked plainbutton
-
-//reworked gui.input parsing
-
-//added purgeDuplicates
-
-//added img commands
-
-//added addRawImage
-
-//added blur for panels
-
 using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
 using System;
@@ -98,17 +82,19 @@ namespace Oxide.Plugins
 
         #region classes
 
-        public class Rectangle
+        public class Rectangle:CuiRectTransformComponent
         {
             public float anchorMinX;
             public float anchorMinY;
             public float anchorMaxX;
             public float anchorMaxY;
-            public string anchorMin => $"{anchorMinX} {anchorMinY}";
-            public string anchorMax => $"{anchorMaxX} {anchorMaxY}";
+            //public string anchorMin => $"{anchorMinX} {anchorMinY}";
+            //public string anchorMax => $"{anchorMaxX} {anchorMaxY}";
 
             public Rectangle()
             {
+                AnchorMin = "0 0";
+                AnchorMax = "1 1";
             }
 
             public Rectangle(float X, float Y, float W, float H, int resX = 1, int resY = 1, bool topLeftOrigin = false)
@@ -119,6 +105,9 @@ namespace Oxide.Plugins
                 anchorMinY = newY / resY;
                 anchorMaxX = (X + W) / resX;
                 anchorMaxY = (newY + H) / resY;
+                
+                AnchorMin = $"{anchorMinX} {anchorMinY}";
+                AnchorMax = $"{anchorMaxX} {anchorMaxY}";
             }
         }
 
@@ -128,6 +117,7 @@ namespace Oxide.Plugins
 
             public GuiColor()
             {
+                color = new Color(1, 1, 1, 1);
             }
 
             public GuiColor(float R, float G, float B, float alpha)
@@ -143,38 +133,46 @@ namespace Oxide.Plugins
                 ColorUtility.TryParseHtmlString(hex, out color);
             }
 
+            public void setAlpha(float alpha)
+            {
+                setAlpha(this, alpha);
+            }
+
+            public static GuiColor setAlpha(GuiColor color, float alpha)
+            {
+                color.color.a = alpha;
+                return color;
+            }
+
             public string getColorString()
             {
                 return $"{color.r} {color.g} {color.b} {color.a}";
             }
         }
 
-        public class GuiText
+        public class GuiText:CuiTextComponent
         {
-            public string text;
-            public int fontSize;
-            public TextAnchor align;
-            public GuiColor color;
 
             public GuiText()
             {
             }
 
-            public GuiText(string text, int fontSize = 14, GuiColor color = null, TextAnchor align = TextAnchor.MiddleCenter)
+            public GuiText(string text, int fontSize = 14, GuiColor color = null, TextAnchor align = TextAnchor.MiddleCenter, float FadeIn = 0)
             {
-                this.text = text;
-                this.fontSize = fontSize;
-                this.align = align;
-                this.color = color ?? new GuiColor(0, 0, 0, 1);
+                this.Text = text;
+                this.FontSize = fontSize;
+                this.Align = align;
+                this.Color = color.getColorString() ?? new GuiColor(0, 0, 0, 1).getColorString();
+                this.FadeIn = FadeIn;
             }
         }
 
         public class CuiInputField
         {
             //public CuiImageComponent Image { get; set; } = new CuiImageComponent();
-            public CuiInputFieldComponent InputField { get; } = new CuiInputFieldComponent();
+            public CuiInputFieldComponent InputField { get; set; } = new CuiInputFieldComponent();
 
-            public CuiRectTransformComponent RectTransform { get; } = new CuiRectTransformComponent();
+            public CuiRectTransformComponent RectTransform { get; set; } = new CuiRectTransformComponent();
             public bool CursorEnabled { get; set; }
             public float FadeOut { get; set; }
         }
@@ -184,7 +182,6 @@ namespace Oxide.Plugins
             public Plugin plugin;
             public string name;
             public string parent;
-            public bool destroyed = false;
             public List<Timer> timers = new List<Timer>();
             private Dictionary<string, Action<BasePlayer, string[]>> callbacks = new Dictionary<string, Action<BasePlayer, string[]>>();
 
@@ -205,6 +202,11 @@ namespace Oxide.Plugins
                 if (this.Count == 0) return;
                 GuiTracker.getGuiTracker(player).addGuiToTracker(plugin, this);
                 CuiHelper.AddUi(player, this);
+            }
+
+            public void destroy(BasePlayer player)
+            {
+                GuiTracker.getGuiTracker(player).destroyGui(plugin, this);
             }
 
             public void registerCallback(string name, Action<BasePlayer, string[]> callback)
@@ -261,12 +263,12 @@ namespace Oxide.Plugins
                 return Name;
             }
 
-            public void addPanel(string name, Rectangle rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, bool blur = false)
+            public void addPanel(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, bool blur = false)
             {
                 addPanel(name, rectangle, layers[(int)layer], panelColor, FadeIn, FadeOut, text, imgName, blur);
             }
 
-            public void addPanel(string name, Rectangle rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, bool blur = false)
+            public void addPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, bool blur = false)
             {
                 if (string.IsNullOrEmpty(name)) name = "panel";
                 if (name == this.name) name = name + "_";
@@ -280,15 +282,15 @@ namespace Oxide.Plugins
                 {
                     this.addImage(name, rectangle, imgName, parent, panelColor, FadeIn, FadeOut);
                 }
-                if (text != null) this.addText(name + "_txt", new Rectangle(0, 0, 1, 1), text, FadeIn, FadeOut, name);
+                if (text != null) this.addText(name + "_txt", new Rectangle(), text, FadeIn, FadeOut, name);
             }
 
-            public void addPlainPanel(string name, Rectangle rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, bool blur = false)
+            public void addPlainPanel(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, bool blur = false)
             {
                 addPlainPanel(name, rectangle, layers[(int)layer], panelColor, FadeIn, FadeOut, blur);
             }
 
-            public void addPlainPanel(string name, Rectangle rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, bool blur = false)
+            public void addPlainPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, bool blur = false)
             {
                 if (string.IsNullOrEmpty(name)) name = "plainPanel";
                 if (name == this.name) name = name + "_";
@@ -301,18 +303,18 @@ namespace Oxide.Plugins
                     Components =
                 {
                     new CuiImageComponent { Color = (panelColor != null)?panelColor.getColorString():"0 0 0 0", FadeIn = FadeIn, Material = blur?"assets/content/ui/uibackgroundblur-ingamemenu.mat":"/Icons/IconMaterial.mat"},
-                    new CuiRectTransformComponent { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax }
+                    rectangle
                 },
                     FadeOut = FadeOut
                 });
             }
 
-            public void addImage(string name, Rectangle rectangle, string imgName, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
+            public void addImage(string name, CuiRectTransformComponent rectangle, string imgName, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 addImage(name, rectangle, imgName, layers[(int)layer], panelColor, FadeIn, FadeOut);
             }
 
-            public void addImage(string name, Rectangle rectangle, string imgName, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
+            public void addImage(string name, CuiRectTransformComponent rectangle, string imgName, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 if (string.IsNullOrEmpty(name)) name = "image";
                 if (name == this.name) name = name + "_";
@@ -325,18 +327,18 @@ namespace Oxide.Plugins
                     Components =
                 {
                     new CuiRawImageComponent { Color = (panelColor != null)?panelColor.getColorString():"1 1 1 1", FadeIn = FadeIn, Png = PluginInstance.getImageData(plugin, imgName)},
-                    new CuiRectTransformComponent { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax }
+                    rectangle
                 },
                     FadeOut = FadeOut
                 });
             }
 
-            public void addRawImage(string name, Rectangle rectangle, string imgData, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
+            public void addRawImage(string name, CuiRectTransformComponent rectangle, string imgData, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 addRawImage(name, rectangle, imgData, layers[(int)layer], panelColor, FadeIn, FadeOut);
             }
 
-            public void addRawImage(string name, Rectangle rectangle, string imgData, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
+            public void addRawImage(string name, CuiRectTransformComponent rectangle, string imgData, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 if (string.IsNullOrEmpty(name)) name = "image";
                 if (name == this.name) name = name + "_";
@@ -349,18 +351,18 @@ namespace Oxide.Plugins
                     Components =
                 {
                     new CuiRawImageComponent { Color = (panelColor != null)?panelColor.getColorString():"1 1 1 1", FadeIn = FadeIn, Png = imgData},
-                    new CuiRectTransformComponent { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax }
+                    rectangle
                 },
                     FadeOut = FadeOut
                 });
             }
 
-            public void addText(string name, Rectangle rectangle, Layer layer, GuiText text = null, float FadeIn = 0, float FadeOut = 0)
+            public void addText(string name, CuiRectTransformComponent rectangle, Layer layer, GuiText text = null, float FadeIn = 0, float FadeOut = 0)
             {
                 addText(name, rectangle, text, FadeIn, FadeOut, layers[(int)layer]);
             }
 
-            public void addText(string name, Rectangle rectangle, GuiText text = null, float FadeIn = 0, float FadeOut = 0, string parent = "Hud")
+            public void addText(string name, CuiRectTransformComponent rectangle, GuiText text = null, float FadeIn = 0, float FadeOut = 0, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "text";
                 if (name == this.name) name = name + "_";
@@ -372,19 +374,19 @@ namespace Oxide.Plugins
                     Name = name,
                     Components =
                 {
-                    new CuiTextComponent { FadeIn = FadeIn, Text = text.text, FontSize = text.fontSize, Align = text.align, Color = text.color.getColorString()},
-                    new CuiRectTransformComponent { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax }
+                    text,
+                    rectangle
                 },
                     FadeOut = FadeOut
                 });
             }
 
-            public void addButton(string name, Rectangle rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null)
+            public void addButton(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null)
             {
                 addButton(name, rectangle, panelColor, FadeIn, FadeOut, text, callback, close, CursorEnabled, imgName, layers[(int)layer]);
             }
 
-            public void addButton(string name, Rectangle rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, string parent = "Hud")
+            public void addButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "button";
                 if (name == this.name) name = name + "_";
@@ -393,7 +395,7 @@ namespace Oxide.Plugins
                 if (imgName != null)
                 {
                     this.addImage(name, rectangle, imgName, parent, null, FadeIn, FadeOut);
-                    this.addPlainButton(name + "_btn", new Rectangle(0, 0, 1, 1), panelColor, FadeIn, FadeOut, text, callback, close, CursorEnabled, name);
+                    this.addPlainButton(name + "_btn", new Rectangle(), panelColor, FadeIn, FadeOut, text, callback, close, CursorEnabled, name);
                 }
                 else
                 {
@@ -401,12 +403,12 @@ namespace Oxide.Plugins
                 }
             }
 
-            public void addPlainButton(string name, Rectangle rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true)
+            public void addPlainButton(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true)
             {
                 addPlainButton(name, rectangle, panelColor, FadeIn, FadeOut, text, callback, close, CursorEnabled, layers[(int)layer]);
             }
 
-            public void addPlainButton(string name, Rectangle rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string parent = "Hud")
+            public void addPlainButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "plainButton";
                 if (name == this.name) name = name + "_";
@@ -426,12 +428,12 @@ namespace Oxide.Plugins
                     Components =
                     {
                         new CuiButtonComponent {Command = $"gui.input {plugin.Name} {this.name} {name}{closeString.ToString()}", FadeIn = FadeIn, Color = (panelColor != null) ? panelColor.getColorString() : "0 0 0 0"},
-                        new CuiRectTransformComponent { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax }
+                        rectangle
                     },
                     FadeOut = FadeOut
                 });
 
-                if(text != null) this.addText(name + "_txt", new Rectangle(0, 0, 1, 1), text, FadeIn, FadeOut, name);
+                if(text != null) this.addText(name + "_txt", new CuiRectTransformComponent(), text, FadeIn, FadeOut, name);
 
                 if (CursorEnabled)
                 {
@@ -448,12 +450,12 @@ namespace Oxide.Plugins
                 if (callback != null) this.registerCallback(name, callback);
             }
 
-            public void addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, Layer layer, string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
+            public void addInput(string name, CuiRectTransformComponent rectangle, Action<BasePlayer, string[]> callback, Layer layer, string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
             {
                 addInput(name, rectangle, callback, layers[(int)layer], close, panelColor, charLimit, text, FadeIn, FadeOut, isPassword, CursorEnabled, imgName);
             }
 
-            public void addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
+            public void addInput(string name, CuiRectTransformComponent rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
             {
                 if (string.IsNullOrEmpty(name)) name = "input";
                 if (name == this.name) name = name + "_";
@@ -472,8 +474,8 @@ namespace Oxide.Plugins
 
                     this.Add(new CuiInputField()
                     {
-                        InputField = { Align = text.align, FontSize = text.fontSize, Color = text.color.getColorString(), Command = $"gui.input {plugin.Name} {this.name} {name}{closeString.ToString()} --input", CharsLimit = charLimit, IsPassword = isPassword },
-                        RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1" },
+                        InputField = { Align = text.Align, FontSize = text.FontSize, Color = text.Color, Command = $"gui.input {plugin.Name} {this.name} {name}{closeString.ToString()} --input", CharsLimit = charLimit, IsPassword = isPassword },
+                        RectTransform = new Rectangle(),
                         CursorEnabled = CursorEnabled,
                         FadeOut = FadeOut
                     }, name, name + "_ipt");
@@ -482,8 +484,8 @@ namespace Oxide.Plugins
                 {
                     this.Add(new CuiInputField()
                     {
-                        InputField = { Align = text.align, FontSize = text.fontSize, Color = text.color.getColorString(), Command = $"gui.input text {plugin.Name} {this.name} {name}{closeString.ToString()} --input", CharsLimit = charLimit, IsPassword = isPassword },
-                        RectTransform = { AnchorMin = rectangle.anchorMin, AnchorMax = rectangle.anchorMax },
+                        InputField = { Align = text.Align, FontSize = text.FontSize, Color = text.Color, Command = $"gui.input text {plugin.Name} {this.name} {name}{closeString.ToString()} --input", CharsLimit = charLimit, IsPassword = isPassword },
+                        RectTransform = rectangle,
                         CursorEnabled = CursorEnabled,
                         FadeOut = FadeOut
                     }, parent, name);
@@ -598,6 +600,22 @@ namespace Oxide.Plugins
                 CuiHelper.DestroyUi(player, name);
             }
 
+            public void destroyAllGui(Plugin plugin)
+            {
+                foreach (GuiContainer container in activeGuiContainers)
+                {
+                    if (container.plugin != plugin) continue;
+                    foreach (Timer timer in container.timers)
+                    {
+                        timer.Destroy();
+                    }
+                    foreach (CuiElement element in container)
+                    {
+                        CuiHelper.DestroyUi(player, element.Name);
+                    }
+                }
+            }
+
             public void destroyAllGui()
             {
                 foreach (GuiContainer container in activeGuiContainers)
@@ -666,16 +684,16 @@ namespace Oxide.Plugins
 #endif
         }
 
+        #endregion API
+
+        #region helpers
+
         public string getItemIcon(string shortname)
         {
             ItemDefinition itemDefinition = ItemManager.FindItemDefinition(shortname);
             if (itemDefinition != null) return ImageLibrary.Call<string>("GetImage", shortname);
             else return "";
         }
-
-        #endregion API
-
-        #region helpers
 
         private string getImageData(Plugin plugin, string name)
         {
