@@ -376,6 +376,8 @@ namespace Oxide.Plugins
                 else name = safeName(name);
                 purgeDuplicates(name);
 
+                text.FadeIn = FadeIn;
+
                 this.Add(new CuiElement
                 {
                     Parent = parent,
