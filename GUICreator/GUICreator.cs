@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Oxide.Plugins
@@ -163,14 +162,7 @@ namespace Oxide.Plugins
                 this.Text = text;
                 this.FontSize = fontSize;
                 this.Align = align;
-                if(color != null)
-                {
-                    this.Color = color.getColorString();
-                }
-                else
-                {
-                    this.Color = new GuiColor(0, 0, 0, 1).getColorString();
-                }
+                this.Color = color.getColorString() ?? new GuiColor(0, 0, 0, 1).getColorString();
                 this.FadeIn = FadeIn;
             }
         }
@@ -196,8 +188,8 @@ namespace Oxide.Plugins
             public GuiContainer(Plugin plugin, string name, string parent = null)
             {
                 this.plugin = plugin;
-                this.name = safeName(name);
-                this.parent = safeName(parent);
+                this.name = name;
+                this.parent = parent;
             }
 
             public enum Layer { overall, overlay, menu, hud, under };
@@ -279,7 +271,7 @@ namespace Oxide.Plugins
             public void addPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, bool blur = false)
             {
                 if (string.IsNullOrEmpty(name)) name = "panel";
-                else name = safeName(name);
+                if (name == this.name) name = name + "_";
                 purgeDuplicates(name);
 
                 if (string.IsNullOrEmpty(imgName))
@@ -301,7 +293,7 @@ namespace Oxide.Plugins
             public void addPlainPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, bool blur = false)
             {
                 if (string.IsNullOrEmpty(name)) name = "plainPanel";
-                else name = safeName(name);
+                if (name == this.name) name = name + "_";
                 purgeDuplicates(name);
 
                 this.Add(new CuiElement
@@ -310,7 +302,7 @@ namespace Oxide.Plugins
                     Name = name,
                     Components =
                 {
-                    new CuiImageComponent { Color = (panelColor != null)?panelColor.getColorString():"0 0 0 0", FadeIn = FadeIn, Material = blur?"assets/content/ui/uibackgroundblur-ingamemenu.mat":"/Icons/IconMaterial.mat"},
+                    new CuiImageComponent { Color = (panelColor != null)?panelColor.getColorString():"0 0 0 0", FadeIn = FadeIn, Material = blur?"assets/content/ui/uibackgroundblur-ingamemenu.mat":"Assets/Icons/IconMaterial.mat"},
                     rectangle
                 },
                     FadeOut = FadeOut
@@ -325,7 +317,7 @@ namespace Oxide.Plugins
             public void addImage(string name, CuiRectTransformComponent rectangle, string imgName, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 if (string.IsNullOrEmpty(name)) name = "image";
-                else name = safeName(name);
+                if (name == this.name) name = name + "_";
                 purgeDuplicates(name);
 
                 this.Add(new CuiElement
@@ -349,7 +341,7 @@ namespace Oxide.Plugins
             public void addRawImage(string name, CuiRectTransformComponent rectangle, string imgData, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 if (string.IsNullOrEmpty(name)) name = "image";
-                else name = safeName(name);
+                if (name == this.name) name = name + "_";
                 purgeDuplicates(name);
 
                 this.Add(new CuiElement
@@ -373,9 +365,9 @@ namespace Oxide.Plugins
             public void addText(string name, CuiRectTransformComponent rectangle, GuiText text = null, float FadeIn = 0, float FadeOut = 0, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "text";
-                else name = safeName(name);
+                if (name == this.name) name = name + "_";
                 purgeDuplicates(name);
-
+                
                 text.FadeIn = FadeIn;
 
                 this.Add(new CuiElement
@@ -399,7 +391,7 @@ namespace Oxide.Plugins
             public void addButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "button";
-                else name = safeName(name);
+                if (name == this.name) name = name + "_";
                 purgeDuplicates(name);
 
                 if (imgName != null)
@@ -421,7 +413,7 @@ namespace Oxide.Plugins
             public void addPlainButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "plainButton";
-                else name = safeName(name);
+                if (name == this.name) name = name + "_";
                 purgeDuplicates(name);
 
                 StringBuilder closeString = new StringBuilder("");
@@ -468,7 +460,7 @@ namespace Oxide.Plugins
             public void addInput(string name, CuiRectTransformComponent rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
             {
                 if (string.IsNullOrEmpty(name)) name = "input";
-                else name = safeName(name);
+                if (name == this.name) name = name + "_";
                 purgeDuplicates(name);
 
                 StringBuilder closeString = new StringBuilder("");
@@ -527,7 +519,6 @@ namespace Oxide.Plugins
 
             public GuiContainer getContainer(Plugin plugin, string name)
             {
-                name = safeName(name);
                 foreach (GuiContainer container in activeGuiContainers)
                 {
                     if (container.plugin != plugin) continue;
@@ -553,7 +544,7 @@ namespace Oxide.Plugins
             public void destroyGui(Plugin plugin, GuiContainer container, string name = null)
             {
                 if (container == null) return;
-                if(string.IsNullOrEmpty(name))
+                if(name == null)
                 {
                     List<GuiContainer> garbage = new List<GuiContainer>();
                     destroyGuiContainer(plugin, container, garbage);
@@ -564,7 +555,6 @@ namespace Oxide.Plugins
                 }
                 else
                 {
-                    name = safeName(name);
                     destroyGuiElement(plugin, container, name);
                 }
             }
@@ -596,7 +586,6 @@ namespace Oxide.Plugins
 
             private void destroyGuiElement(Plugin plugin, GuiContainer container, string name)
             {
-                name = safeName(name);
 #if DEBUG
                 player.ChatMessage($"destroyGui: {plugin.Name} {name}");
 #endif
@@ -711,12 +700,6 @@ namespace Oxide.Plugins
         private string getImageData(Plugin plugin, string name)
         {
             return (string)PluginInstance.ImageLibrary.Call("GetImage", $"{plugin.Name}_{name}");
-        }
-
-        private static string safeName(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return null;
-            return Regex.Replace(name, " ", "_");
         }
 
         #endregion helpers
