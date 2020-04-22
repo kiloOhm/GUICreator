@@ -152,7 +152,6 @@ namespace Oxide.Plugins
 
         public class GuiText:CuiTextComponent
         {
-
             public GuiText()
             {
             }
@@ -162,7 +161,7 @@ namespace Oxide.Plugins
                 this.Text = text;
                 this.FontSize = fontSize;
                 this.Align = align;
-                this.Color = color.getColorString() ?? new GuiColor(0, 0, 0, 1).getColorString();
+                this.Color = color?.getColorString() ?? new GuiColor(0, 0, 0, 1).getColorString();
                 this.FadeIn = FadeIn;
             }
         }
