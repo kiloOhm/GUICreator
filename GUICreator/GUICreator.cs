@@ -196,13 +196,15 @@ namespace Oxide.Plugins
             public string name;
             public string parent;
             public List<Timer> timers = new List<Timer>();
+            public Action<BasePlayer> closeCallback;
             private Dictionary<string, Action<BasePlayer, string[]>> callbacks = new Dictionary<string, Action<BasePlayer, string[]>>();
 
-            public GuiContainer(Plugin plugin, string name, string parent = null)
+            public GuiContainer(Plugin plugin, string name, string parent = null, Action<BasePlayer> closeCallback = null)
             {
                 this.plugin = plugin;
                 this.name = safeName(name);
                 this.parent = safeName(parent);
+                this.closeCallback = closeCallback;
             }
 
             public enum Layer { overall, overlay, menu, hud, under };
@@ -587,6 +589,7 @@ namespace Oxide.Plugins
                         if (cont.plugin != container.plugin) continue;
                         if (cont.parent == container.name) destroyGuiContainer(cont.plugin, cont, garbage);
                     }
+                    container.closeCallback(player);
                     foreach (CuiElement element in container)
                     {
                         destroyGuiElement(plugin, container, element.Name);
