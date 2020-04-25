@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "OHM", "1.2.4")]
+    [Info("GUICreator", "OHM", "1.2.5")]
     [Description("GUICreator")]
     internal class GUICreator : RustPlugin
     {
@@ -589,7 +589,7 @@ namespace Oxide.Plugins
                         if (cont.plugin != container.plugin) continue;
                         if (cont.parent == container.name) destroyGuiContainer(cont.plugin, cont, garbage);
                     }
-                    container.closeCallback(player);
+                    container.closeCallback?.Invoke(player);
                     foreach (CuiElement element in container)
                     {
                         destroyGuiElement(plugin, container, element.Name);
