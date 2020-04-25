@@ -6,11 +6,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "OHM", "1.2.2")]
+    [Info("GUICreator", "OHM", "1.2.4")]
     [Description("GUICreator")]
     internal class GUICreator : RustPlugin
     {
@@ -84,10 +85,17 @@ namespace Oxide.Plugins
 
         public class Rectangle:CuiRectTransformComponent
         {
-            public float anchorMinX;
-            public float anchorMinY;
-            public float anchorMaxX;
-            public float anchorMaxY;
+            public double anchorMinX;
+            public double anchorMinY;
+            public double anchorMaxX;
+            public double anchorMaxY;
+
+            public double X;
+            public double Y;
+            public double W;
+            public double H;
+
+            bool topLeftOrigin;
             //public string anchorMin => $"{anchorMinX} {anchorMinY}";
             //public string anchorMax => $"{anchorMaxX} {anchorMaxY}";
 
@@ -97,9 +105,15 @@ namespace Oxide.Plugins
                 AnchorMax = "1 1";
             }
 
-            public Rectangle(float X, float Y, float W, float H, int resX = 1, int resY = 1, bool topLeftOrigin = false)
+            public Rectangle(double X, double Y, double W, double H, double resX = 1, double resY = 1, bool topLeftOrigin = false)
             {
-                float newY = topLeftOrigin ? resY - Y - H : Y;
+                this.X = X;
+                this.Y = Y;
+                this.W = W;
+                this.H = H;
+                this.topLeftOrigin = topLeftOrigin;
+
+                double newY = topLeftOrigin ? resY - Y - H : Y;
 
                 anchorMinX = X / resX;
                 anchorMinY = newY / resY;
@@ -187,8 +201,8 @@ namespace Oxide.Plugins
             public GuiContainer(Plugin plugin, string name, string parent = null)
             {
                 this.plugin = plugin;
-                this.name = name;
-                this.parent = parent;
+                this.name = safeName(name);
+                this.parent = safeName(parent);
             }
 
             public enum Layer { overall, overlay, menu, hud, under };
@@ -270,7 +284,7 @@ namespace Oxide.Plugins
             public void addPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, bool blur = false)
             {
                 if (string.IsNullOrEmpty(name)) name = "panel";
-                if (name == this.name) name = name + "_";
+                else name = safeName(name);
                 purgeDuplicates(name);
 
                 if (string.IsNullOrEmpty(imgName))
@@ -292,7 +306,7 @@ namespace Oxide.Plugins
             public void addPlainPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, bool blur = false)
             {
                 if (string.IsNullOrEmpty(name)) name = "plainPanel";
-                if (name == this.name) name = name + "_";
+                else name = safeName(name);
                 purgeDuplicates(name);
 
                 this.Add(new CuiElement
@@ -316,7 +330,7 @@ namespace Oxide.Plugins
             public void addImage(string name, CuiRectTransformComponent rectangle, string imgName, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 if (string.IsNullOrEmpty(name)) name = "image";
-                if (name == this.name) name = name + "_";
+                else name = safeName(name);
                 purgeDuplicates(name);
 
                 this.Add(new CuiElement
@@ -340,7 +354,7 @@ namespace Oxide.Plugins
             public void addRawImage(string name, CuiRectTransformComponent rectangle, string imgData, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
             {
                 if (string.IsNullOrEmpty(name)) name = "image";
-                if (name == this.name) name = name + "_";
+                else name = safeName(name);
                 purgeDuplicates(name);
 
                 this.Add(new CuiElement
@@ -364,7 +378,7 @@ namespace Oxide.Plugins
             public void addText(string name, CuiRectTransformComponent rectangle, GuiText text = null, float FadeIn = 0, float FadeOut = 0, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "text";
-                if (name == this.name) name = name + "_";
+                else name = safeName(name);
                 purgeDuplicates(name);
                 
                 text.FadeIn = FadeIn;
@@ -390,7 +404,7 @@ namespace Oxide.Plugins
             public void addButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "button";
-                if (name == this.name) name = name + "_";
+                else name = safeName(name);
                 purgeDuplicates(name);
 
                 if (imgName != null)
@@ -412,7 +426,7 @@ namespace Oxide.Plugins
             public void addPlainButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string parent = "Hud")
             {
                 if (string.IsNullOrEmpty(name)) name = "plainButton";
-                if (name == this.name) name = name + "_";
+                else name = safeName(name);
                 purgeDuplicates(name);
 
                 StringBuilder closeString = new StringBuilder("");
@@ -459,7 +473,7 @@ namespace Oxide.Plugins
             public void addInput(string name, CuiRectTransformComponent rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
             {
                 if (string.IsNullOrEmpty(name)) name = "input";
-                if (name == this.name) name = name + "_";
+                else name = safeName(name);
                 purgeDuplicates(name);
 
                 StringBuilder closeString = new StringBuilder("");
@@ -518,6 +532,7 @@ namespace Oxide.Plugins
 
             public GuiContainer getContainer(Plugin plugin, string name)
             {
+                name = safeName(name);
                 foreach (GuiContainer container in activeGuiContainers)
                 {
                     if (container.plugin != plugin) continue;
@@ -537,7 +552,8 @@ namespace Oxide.Plugins
 
             public void destroyGui(Plugin plugin, string containerName, string name = null)
             {
-                destroyGui(plugin, getContainer(plugin, containerName), name);
+                if (name != null) name = safeName(name);
+                destroyGui(plugin, getContainer(plugin, safeName(containerName)), name);
             }
 
             public void destroyGui(Plugin plugin, GuiContainer container, string name = null)
@@ -554,6 +570,7 @@ namespace Oxide.Plugins
                 }
                 else
                 {
+                    name = safeName(name);
                     destroyGuiElement(plugin, container, name);
                 }
             }
@@ -585,6 +602,7 @@ namespace Oxide.Plugins
 
             private void destroyGuiElement(Plugin plugin, GuiContainer container, string name)
             {
+                name = safeName(name);
 #if DEBUG
                 player.ChatMessage($"destroyGui: {plugin.Name} {name}");
 #endif
@@ -677,9 +695,9 @@ namespace Oxide.Plugins
             container.display(player);
         }
 
-        public void registerImage(Plugin plugin, string name, string url)
+        public void registerImage(Plugin plugin, string name, string url, Action callback = null)
         {
-            ImageLibrary.Call("AddImage", url, $"{plugin.Name}_{name}");
+            ImageLibrary.Call("AddImage", url, $"{plugin.Name}_{name}", (ulong)0, callback);
 #if DEBUG
             PrintToChat($"{plugin.Name} registered {name} image");
 #endif
@@ -701,6 +719,11 @@ namespace Oxide.Plugins
             return (string)PluginInstance.ImageLibrary.Call("GetImage", $"{plugin.Name}_{name}");
         }
 
+        private static string safeName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+            return Regex.Replace(name, " ", "_");
+        }
         #endregion helpers
 
         #region commands
@@ -844,28 +867,42 @@ namespace Oxide.Plugins
                 PrintToChat(player, lang.GetMessage("noPermission", this, player.UserIDString));
                 return;
             }
-            GuiContainer container = new GuiContainer(this, "imgPreview");
-
-            container.addRawImage("img", new Rectangle(710, 290, 500, 500, 1920, 1080, true), ImageLibrary.Call<string>("GetImage", args[0]), GUICreator.GuiContainer.Layer.hud);
-            container.addPlainButton("close", new Rectangle(0.15f, 0.15f, 0.1f, 0.1f), new GuiColor(1, 0, 0, 0.8f), 0, 0, new GuiText("close"));
-            container.display(player);
+            imgPreview(player, args[0]);
         }
 
-        [ChatCommand("registerimg")]
-        private void imgRegisterCommand(BasePlayer player, string command, string[] args)
+        public void imgPreview(BasePlayer player, string url)
+        {
+            Action callback = () =>
+            {
+                Rectangle rectangle = new Rectangle(710, 290, 500, 500, 1920, 1080, true);
+                GuiContainer container = new GuiContainer(PluginInstance, $"imgPreview");
+                container.addRawImage($"img", rectangle, ImageLibrary.Call<string>("GetImage", $"GUICreator_preview_{url}"), "Hud");
+                container.addPlainButton("close", new Rectangle(0.15f, 0.15f, 0.1f, 0.1f), new GuiColor(1, 0, 0, 0.8f), 0, 0, new GuiText("close"));
+                container.display(player);
+            };
+            if (ImageLibrary.Call<bool>("HasImage", $"GUICreator_preview_{url}", (ulong)0))
+            {
+                callback();
+            }
+            else ImageLibrary.Call<bool>("AddImage", url, $"GUICreator_preview_{url}", (ulong)0, callback);
+
+        }
+
+        [ChatCommand("imgraw")]
+        private void imgrawPreviewCommand(BasePlayer player, string command, string[] args)
         {
             if (!permission.UserHasPermission(player.UserIDString, "gui.demo"))
             {
                 PrintToChat(player, lang.GetMessage("noPermission", this, player.UserIDString));
                 return;
             }
-            try
-            {
-                ImageLibrary.Call("AddImage", args[1], args[0]);
-                player.ChatMessage($"registered {args[0]}");
-            }
-            catch (Exception e) { }
+            GuiContainer container = new GuiContainer(this, "imgPreview");
+
+            container.addRawImage("img", new Rectangle(710, 290, 500, 500, 1920, 1080, true), args[0], GUICreator.GuiContainer.Layer.hud);
+            container.addPlainButton("close", new Rectangle(0.15f, 0.15f, 0.1f, 0.1f), new GuiColor(1, 0, 0, 0.8f), 0, 0, new GuiText("close"));
+            container.display(player);
         }
+
 
         #endregion commands
 
