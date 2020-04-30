@@ -1,5 +1,6 @@
-The GUICreator is primarily an API Plugin to simplify generating/handling Rust GUI.
-It also offers several premade GUI elements which can be used with a single function call.
+GUICreator is an API Plugin to simplify generating/handling Rust GUI.
+At its core, it tracks all GUI containers sent to players, destroys GUI in the right order and allows developers to use callbacks with buttons/inputs.
+There are also several handy functions in the GuiContainer class to keep the lines of code required for a complex UI to a minimum.
 
 Classes:
 
@@ -7,14 +8,20 @@ Classes:
 	Not reinventing the wheel here, just providing more flexibility for defining CuiRectTransformComponents.
 	coordinates are fractions of the total resolution of each client screen. (e.g. "0.5 0.5" is the middle of the screen )
 	Relevant properties:
-		float anchorMinX - X value of the bottom left corner
-        float anchorMinY - Y value of the bottom left corner
-        float anchorMaxX - X value of the top right corner
-        float anchorMaxY - Y value of the top right corner
+		double anchorMinX - X value of the bottom left corner
+        double anchorMinY - Y value of the bottom left corner
+        double anchorMaxX - X value of the top right corner
+        double anchorMaxY - Y value of the top right corner
+		double X - X Value of Origin (default: bottom left corner, if topLeftOrigin is true, top left corner)
+		double Y - Y Value of Origin (default: bottom left corner, if topLeftOrigin is true, top left corner)
+		double W - Width of Rectangle
+		double H - Height of Rectangle
+		bool topLeftOrigin - determines origin. for use with figma
+
 	Constructors:
 		The default constructor sets anchorMinX and anchorMinY to 0, anchorMaxX and anchorMaxY to 1. The rectangle spans the entire screen/parent
 		
-		Rectangle(float X, float Y, float W, float H, int resX = 1, int resY = 1, bool topLeftOrigin = false)
+		Rectangle(double X, double Y, double W, double H, double resX = 1, double resY = 1, bool topLeftOrigin = false)
 		- x and y are the coordinate of the bottom left (or top left if topLeftOrigin is true) corner. W is the width, H is H is the height of the rectangle.
 		  resX is the horizontal resolution and resY the vertical resolution. (x = 10, y = 10, resX = 20, resY = 20) is the middle of the screen.
 		  This was intended for use with figma (or similar UI Desing tools). For use with figma, set topLeftOrigin to true and set resX, resY to the dimensions of your frame.
@@ -67,7 +74,9 @@ Classes:
 		enum Layer { overall, overlay, menu, hud, under } - layers on which GUI can be displayed. The Rust Hud and UI is displayed between hud and menu.
 	Constructors:
 		There is no default constructor
-		GuiContainer(Plugin plugin, string name, string parent = null)
+		GuiContainer(Plugin plugin, string name, string parent = null, Action<BasePlayer> closeCallback = null)
+		Parenting GuiContainers doesn't affect positioning but destroys all children containers upon destruction.
+		closeCallback is invoked before the guiContainer is destroyed.
 	Relevant Methods:
 		display(BasePlayer player)
 		destroy(BasePlayer player)
@@ -85,7 +94,7 @@ Classes:
 		addInput(string name, CuiRectTransformComponent rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
 
 	If you specify names of other elements within the container in the "close" strings of Buttons and Inputs, said elements and their children will be destroyed on click/enter
-	I recommend using the least complex method (plainPanel, plainButton, text, image) for your task to reduce CuiElements that are sent to clients.
+	I recommend using the least complex method (plainPanel, plainButton, text, image) for your task to reduce Cui Components that are sent to clients.
 	Singular GUI Elements can only be parented to other Elements within their container. Children Elements are destroyed upon destruction of their parents and have their frame overridden to be the RectTransform of their parent.
 	Instead of parents, all methods take a layer also. 
 
@@ -123,5 +132,5 @@ Commands:
 	Chat:
 	-these require the player to have the oxide permission "gui.demo"
 		/guidemo - demonstrates all elements
-		/img [name] - displays an image from the ImageLibrary
-		/registerimg [name] [url] - registers an image to the ImageLibrary
+		/img [url] - displays an image after it's been downloaded
+		/imgraw [imgData] - displays an image from raw image data. for debugging
