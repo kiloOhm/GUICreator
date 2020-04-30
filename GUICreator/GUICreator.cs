@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "OHM", "1.2.5")]
+    [Info("GUICreator", "kOhm", "1.2.5")]
     [Description("GUICreator")]
     internal class GUICreator : RustPlugin
     {
@@ -517,8 +517,8 @@ namespace Oxide.Plugins
 
             public static GuiTracker getGuiTracker(BasePlayer player)
             {
-
-                player.gameObject.TryGetComponent<GuiTracker>(out GuiTracker output);
+                GuiTracker output;
+                player.gameObject.TryGetComponent<GuiTracker>(out output);
 
                 if (output == null)
                 {
@@ -778,8 +778,9 @@ namespace Oxide.Plugins
             List<string> close = new List<string>();
             List<string> input = new List<string>();
             List<string> select = null;
+            string next;
 
-            while (args.TryPop(out string next))
+            while (args.TryPop(out next))
             {
                 if (next == "--close") select = close;
                 else if (next == "--input") select = input;
@@ -838,7 +839,7 @@ namespace Oxide.Plugins
                 container.addText("demo_inputLabel", new Rectangle(0.375f, 0.85f, 0.25f, 0.1f), new GuiText("Print to chat:", 50), 1, 1);
                 Action<BasePlayer, string[]> inputCallback = (bPlayer, input) => { PrintToChat(bPlayer, string.Concat(input)); };
                 container.addInput("demo_input", new Rectangle(0.375f, 0.75f, 0.25f, 0.1f), inputCallback, GuiContainer.Layer.hud, null, new GuiColor("white"), 100, new GuiText("", 50), 1, 1);
-                container.addButton("close", new Rectangle(0.1f, 0.1f, 0.1f, 0.1f), panelColor: new GuiColor("red"), FadeIn: 1, FadeOut: 1, text: new GuiText("close", 50));
+                container.addPlainButton("close", new Rectangle(0.1f, 0.1f, 0.1f, 0.1f), panelColor: new GuiColor("red"), FadeIn: 1, FadeOut: 1, text: new GuiText("close", 50));
                 container.display(player);
 
                 GuiContainer container2 = new GuiContainer(this, "demo_child", "demo");
