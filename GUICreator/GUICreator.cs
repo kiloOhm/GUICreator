@@ -848,9 +848,7 @@ namespace Oxide.Plugins
             double refH = 100f / 1080f;
 
             double maxSize = 59f * Math.Pow((H / refH), 0.95f);
-            PrintToChat(maxSize.ToString());
             double maxLengthAtMaxSize = W * (3.911f/H);
-            PrintToChat(maxLengthAtMaxSize.ToString());
             if (length <= maxLengthAtMaxSize) return (int)maxSize;
             return (int)(maxSize * (maxLengthAtMaxSize / length));
         }
