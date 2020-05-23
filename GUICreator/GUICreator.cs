@@ -96,6 +96,9 @@ namespace Oxide.Plugins
             public double W;
             public double H;
 
+            public double resX;
+            public double resY;
+
             bool topLeftOrigin;
             //public string anchorMin => $"{anchorMinX} {anchorMinY}";
             //public string anchorMax => $"{anchorMaxX} {anchorMaxY}";
@@ -112,6 +115,10 @@ namespace Oxide.Plugins
                 this.Y = Y;
                 this.W = W;
                 this.H = H;
+
+                this.resX = resX;
+                this.resY = resY;
+
                 this.topLeftOrigin = topLeftOrigin;
 
                 double newY = topLeftOrigin ? resY - Y - H : Y;
@@ -834,6 +841,20 @@ namespace Oxide.Plugins
 
         #region helpers
 
+        public int getFontsizeByFramesize(float length, Rectangle rectangle)
+        {
+            double W = rectangle.W / rectangle.resX;
+            double H = rectangle.H / rectangle.resY;
+            double refH = 100f / 1080f;
+
+            double maxSize = 59f * Math.Pow((H / refH), 0.95f);
+            PrintToChat(maxSize.ToString());
+            double maxLengthAtMaxSize = W * (3.911f/H);
+            PrintToChat(maxLengthAtMaxSize.ToString());
+            if (length <= maxLengthAtMaxSize) return (int)maxSize;
+            return (int)(maxSize * (maxLengthAtMaxSize / length));
+        }
+
         public List<List<T>> SplitIntoChunks<T>(List<T> list, int chunkSize = 30)
         {
             if (chunkSize <= 0)
@@ -995,7 +1016,15 @@ namespace Oxide.Plugins
         [ChatCommand("test")]
         private void testCommand(BasePlayer player, string command, string[] args)
         {
-            prompt(player, "test", "test");
+            GuiContainer c = new GuiContainer(this, "test");
+            Rectangle testPos = new Rectangle(460, 250, 1300, 300, 1920, 1080, true);
+            int fontsize = getFontsizeByFramesize(args[0].Length, testPos);
+            //int fontsize = getFontsizeByLength(args[0].Length, 22, 59);
+            player.ChatMessage(fontsize.ToString());
+            GuiText testText = new GuiText(args[0], fontsize, new GuiColor(0,0,0,1));
+            c.addPanel("test", testPos, GuiContainer.Layer.hud, new GuiColor(1,1,1,1), text: testText);
+            c.addPlainButton("close", new Rectangle(0.25f, 0.25f, 0.1f, 0.1f), GuiContainer.Layer.hud, new GuiColor("red"));
+            c.display(player);
         }
 
         [ChatCommand("guidemo")]
