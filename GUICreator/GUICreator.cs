@@ -11,8 +11,8 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "OHM", "1.2.5")]
-    [Description("GUICreator")]
+    [Info("GUICreator", "OHM", "1.2.6")]
+    [Description("API Plugin for centralized GUI creation and management")]
     internal class GUICreator : RustPlugin
     {
         #region global
@@ -208,6 +208,14 @@ namespace Oxide.Plugins
             //Rust UI elements (inventory, Health, etc.) are between the hud and the menu layer
             public static List<string> layers = new List<string> { "Overall", "Overlay", "Hud.Menu", "Hud", "Under" };
 
+            public enum Blur {slight, medium, strong, none};
+            public static List<string> blurs = new List<string>
+            {
+                "assets/content/ui/uibackgroundblur-notice.mat",
+                "assets/content/ui/uibackgroundblur-ingamemenu.mat",
+                "assets/content/ui/uibackgroundblur.mat"
+            };
+
             public void display(BasePlayer player)
             {
                 if (this.Count == 0) return;
@@ -284,12 +292,12 @@ namespace Oxide.Plugins
                 return Name;
             }
 
-            public void addPanel(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, bool blur = false)
+            public void addPanel(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, Blur blur = Blur.none)
             {
                 addPanel(name, rectangle, layers[(int)layer], panelColor, FadeIn, FadeOut, text, imgName, blur);
             }
 
-            public void addPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, bool blur = false)
+            public void addPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, Blur blur = Blur.none)
             {
                 if (string.IsNullOrEmpty(name)) name = "panel";
                 purgeDuplicates(name);
@@ -305,16 +313,19 @@ namespace Oxide.Plugins
                 if (text != null) this.addText(name + "_txt", new Rectangle(), text, FadeIn, FadeOut, name);
             }
 
-            public void addPlainPanel(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, bool blur = false)
+            public void addPlainPanel(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, Blur blur = Blur.none)
             {
                 addPlainPanel(name, rectangle, layers[(int)layer], panelColor, FadeIn, FadeOut, blur);
             }
 
-            public void addPlainPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, bool blur = false)
+            public void addPlainPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, Blur blur = Blur.none)
             {
                 if (string.IsNullOrEmpty(name)) name = "plainPanel";
                 
                 purgeDuplicates(name);
+
+                string materialString = "Assets/Icons/IconMaterial.mat";
+                if (blur != Blur.none) materialString = blurs[(int)blur];
 
                 this.Add(new CuiElement
                 {
@@ -322,7 +333,7 @@ namespace Oxide.Plugins
                     Name = name,
                     Components =
                 {
-                    new CuiImageComponent { Color = (panelColor != null)?panelColor.getColorString():"0 0 0 0", FadeIn = FadeIn, Material = blur?"assets/content/ui/uibackgroundblur-ingamemenu.mat":"Assets/Icons/IconMaterial.mat"},
+                    new CuiImageComponent { Color = (panelColor != null)?panelColor.getColorString():"0 0 0 0", FadeIn = FadeIn, Material = materialString},
                     rectangle
                 },
                     FadeOut = FadeOut
@@ -403,12 +414,12 @@ namespace Oxide.Plugins
                 });
             }
 
-            public void addButton(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, bool blur = false)
+            public void addButton(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, Blur blur = Blur.none)
             {
                 addButton(name, rectangle, panelColor, FadeIn, FadeOut, text, callback, close, CursorEnabled, imgName, layers[(int)layer], blur);
             }
 
-            public void addButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, string parent = "Hud", bool blur = false)
+            public void addButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, string parent = "Hud", Blur blur = Blur.none)
             {
                 if (string.IsNullOrEmpty(name)) name = "button";
                 
@@ -425,12 +436,12 @@ namespace Oxide.Plugins
                 }
             }
 
-            public void addPlainButton(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, bool blur = false)
+            public void addPlainButton(string name, CuiRectTransformComponent rectangle, Layer layer, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, Blur blur = Blur.none)
             {
                 addPlainButton(name, rectangle, panelColor, FadeIn, FadeOut, text, callback, close, CursorEnabled, layers[(int)layer], blur);
             }
 
-            public void addPlainButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string parent = "Hud", bool blur = false)
+            public void addPlainButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string parent = "Hud", Blur blur = Blur.none)
             {
                 if (string.IsNullOrEmpty(name)) name = "plainButton";
                 
@@ -443,13 +454,16 @@ namespace Oxide.Plugins
                     closeString.Append(close);
                 }
 
+                string materialString = "Assets/Icons/IconMaterial.mat";
+                if (blur != Blur.none) materialString = blurs[(int)blur];
+
                 this.Add(new CuiElement
                 {
                     Name = name,
                     Parent = parent,
                     Components =
                     {
-                        new CuiButtonComponent {Command = $"gui.input {plugin.Name} {this.name} {removeWhiteSpaces(name)}{closeString.ToString()}", FadeIn = FadeIn, Color = (panelColor != null) ? panelColor.getColorString() : "0 0 0 0", Material = blur?"assets/content/ui/uibackgroundblur-ingamemenu.mat":"Assets/Icons/IconMaterial.mat"},
+                        new CuiButtonComponent {Command = $"gui.input {plugin.Name} {this.name} {removeWhiteSpaces(name)}{closeString.ToString()}", FadeIn = FadeIn, Color = (panelColor != null) ? panelColor.getColorString() : "0 0 0 0", Material = materialString},
                         rectangle
                     },
                     FadeOut = FadeOut
@@ -682,7 +696,6 @@ namespace Oxide.Plugins
         #endregion classes
 
         #region API
-
         public enum gametipType { gametip, warning, error }
 
         public void customGameTip(BasePlayer player, string text, float duration = 0, gametipType type = gametipType.gametip)
@@ -729,7 +742,7 @@ namespace Oxide.Plugins
                 GuiTracker.getGuiTracker(player).destroyGui(PluginInstance, "gametip");
             };
             GuiContainer containerGUI = new GuiContainer(this, "prompt");
-            containerGUI.addPlainPanel("background", new Rectangle(700, 377, 520, 243, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0,0,0,0.6f), 0.1f, 0.1f, true);
+            containerGUI.addPlainPanel("background", new Rectangle(700, 377, 520, 243, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0,0,0,0.6f), 0.1f, 0.1f, GuiContainer.Blur.medium);
             containerGUI.addPanel("msg", new Rectangle(755, 469, 394, 56, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(message, 10, new GuiColor(255, 255, 255, 0.8f)));
             containerGUI.addPanel("header", new Rectangle(800, 404, 318, 56, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(header, 25, new GuiColor(255, 255, 255, 0.8f)));
             containerGUI.addPlainButton("close", new Rectangle(802, 536, 318, 56, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(65, 33, 32, 0.8f), 0.1f, 0.1f, new GuiText("CLOSE", 20, new GuiColor(162, 51, 46, 0.8f)), closeCallback);
@@ -742,7 +755,7 @@ namespace Oxide.Plugins
             int maxItems = 5;
             List<List<string>> ListOfLists = SplitIntoChunks<string>(options, maxItems);
             GuiContainer container = new GuiContainer(this, "dropdown", parent);
-            container.addPlainPanel("dropdown_background", rectangle, GuiContainer.Layer.menu, new GuiColor(0, 0, 0, 0.6f), 0, 0, true);
+            container.addPlainPanel("dropdown_background", rectangle, GuiContainer.Layer.menu, new GuiColor(0, 0, 0, 0.6f), 0, 0, GuiContainer.Blur.medium);
 
             double cfX = rectangle.W / 300;
             double cfY = rectangle.H / 570;
@@ -1043,7 +1056,9 @@ namespace Oxide.Plugins
         private void testCommand(BasePlayer player, string command, string[] args)
         {
             GuiContainer c = new GuiContainer(this, "test");
-            Rectangle pos = new Rectangle(0.25f, 0.25f, 0.5f, 0.5f);
+            Rectangle pos = new Rectangle(0.25f, 0.25f, 0.25f, 0.25f);
+            Rectangle pos2 = new Rectangle(0.5f, 0.25f, 0.25f, 0.25f);
+            Rectangle pos3 = new Rectangle(0.25f, 0.5f, 0.25f, 0.25f);
             c.Add(new CuiElement
             {
                 Name = "test",
@@ -1052,10 +1067,35 @@ namespace Oxide.Plugins
                     new CuiImageComponent 
                     { 
                         Color = "0 1 0 0.5", 
-                        //Material = args[0]
-                        Sprite = args[0]
+                        Material = "assets/content/ui/uibackgroundblur-notice.mat"
                     },
                     pos
+                },
+            });
+            c.Add(new CuiElement
+            {
+                Name = "test2",
+                Components =
+                {
+                    new CuiImageComponent
+                    {
+                        Color = "0 1 0 0.5",
+                        Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat"
+                    },
+                    pos2
+                },
+            });
+            c.Add(new CuiElement
+            {
+                Name = "test3",
+                Components =
+                {
+                    new CuiImageComponent
+                    {
+                        Color = "0 1 0 0.5",
+                        Material = "assets/content/ui/uibackgroundblur.mat"
+                    },
+                    pos3
                 },
             });
             c.display(player);
