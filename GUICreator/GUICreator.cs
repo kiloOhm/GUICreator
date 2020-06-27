@@ -68,18 +68,6 @@ namespace Oxide.Plugins
             GuiTracker.getGuiTracker(player).destroyAllGui();
         }
 
-        private object OnPlayerWound(BasePlayer player)
-        {
-            GuiTracker.getGuiTracker(player).destroyAllGui();
-            return null;
-        }
-
-        private object OnPlayerDeath(BasePlayer player, HitInfo info)
-        {
-            GuiTracker.getGuiTracker(player).destroyAllGui();
-            return null;
-        }
-
         #endregion oxide hooks
 
         #region classes
@@ -831,7 +819,9 @@ namespace Oxide.Plugins
 
         public void registerImage(Plugin plugin, string name, string url, Action callback = null)
         {
-            ImageLibrary.Call("AddImage", url, $"{plugin.Name}_{name}", (ulong)0, callback);
+            string safeName = $"{plugin.Name}_{name}";
+
+            if (!ImageLibrary.Call<bool>("HasImage", safeName)) ImageLibrary.Call("AddImage", url, safeName, (ulong)0, callback);
 #if DEBUG
             PrintToChat($"{plugin.Name} registered {name} image");
 #endif
@@ -900,6 +890,58 @@ namespace Oxide.Plugins
 
         #region commands
 
+        public class Command
+        {
+            const string flagSymbols = "/-";
+            public string fullString;
+            public string name;
+            public List<string> args = new List<string>();
+            public Dictionary<string, List<string>> flags = new Dictionary<string, List<string>>();
+
+            public Command(string fullString)
+            {
+                this.fullString = fullString;
+                string[] split = Regex.Split(fullString, " ");
+                if (split.Length < 1) return;
+                name = split.First();
+                if (split.Length < 2) return;
+                split = split.Skip(1).ToArray();
+                List<string> flag = null;
+                foreach (string arg in split)
+                {
+                    if (flagSymbols.Contains(arg.First()))
+                    {
+                        string sanitizedFlag = arg.Substring(1);
+                        if (!flags.ContainsKey(sanitizedFlag))
+                        {
+                            flags.Add(sanitizedFlag, new List<string>());
+                        }
+                        flag = flags[sanitizedFlag];
+                    }
+                    else if (flag != null) flag.Add(arg);
+                    else args.Add(arg);
+                }
+            }
+
+            public override string ToString()
+            {
+                StringBuilder sb = new StringBuilder($"{name} ");
+                foreach (string arg in args)
+                {
+                    sb.Append($"{arg} ");
+                }
+                foreach (string flag in flags.Keys)
+                {
+                    sb.Append($"\n{flag}: ");
+                    foreach (string arg in flags[flag])
+                    {
+                        sb.Append($"{arg} ");
+                    }
+                }
+                return sb.ToString();
+            }
+        }
+
         private void closeUi(ConsoleSystem.Arg arg)
         {
             GuiTracker.getGuiTracker(arg.Player()).destroyAllGui();
@@ -938,7 +980,7 @@ namespace Oxide.Plugins
             BasePlayer player = arg.Player();
             if (player == null) return;
 
-#if DEBUG
+#if DEBUG2
             SendReply(arg, $"OnGuiInput: gui.input {arg.FullString}");
             player.ChatMessage($"OnGuiInput: gui.input {arg.FullString}");
 #endif
@@ -946,60 +988,46 @@ namespace Oxide.Plugins
             GuiTracker tracker = GuiTracker.getGuiTracker(player);
 
             #region parsing
-            Stack<string> args = new Stack<string>(arg.Args.Reverse<string>());
 
-            Plugin plugin = Manager.GetPlugin(args.Pop());
+            Command cmd = new Command("gui.input " + arg.FullString);
+#if DEBUG
+            player.ChatMessage(cmd.ToString());
+#endif
+
+            Plugin plugin = Manager.GetPlugin(cmd.args[0]);
             if (plugin == null)
             {
                 SendReply(arg, "OnGuiInput: Plugin not found!");
                 return;
             }
 
-            GuiContainer container = tracker.getContainer(plugin, args.Pop());
+            GuiContainer container = tracker.getContainer(plugin, cmd.args[1]);
             if (container == null)
             {
                 SendReply(arg, "OnGuiInput: Container not found!");
                 return;
             }
 
-            string inputName = args.Pop();
+            string inputName = cmd.args[2];
 
             bool closeContainer = false;
             if (inputName == "close" || inputName == "close_btn") closeContainer = true;
-
-            List<string> close = new List<string>();
-            List<string> input = new List<string>();
-            List<string> select = null;
-            string next;
-
-            while (args.TryPop(out next))
-            {
-                if (next == "--close") select = close;
-                else if (next == "--input") select = input;
-                else
-                {
-                    if (select == null)
-                    {
-                        SendReply(arg, $"OnGuiInput: Couldn't interpret {next}");
-                        continue;
-                    }
-                    else select.Add(next);
-                }
-            }
             #endregion
 
             #region execution
-
-            if (!container.runCallback(inputName, player, input.ToArray()))
+            string[] input = null;
+            if (cmd.flags.ContainsKey("-input")) input = cmd.flags["-input"].ToArray();
+ 
+            if (!container.runCallback(inputName, player, input))
             {
 #if DEBUG
                 SendReply(arg, $"OnGuiInput: Callback for {plugin.Name} {container.name} {inputName} wasn't found");
 #endif
             }
 
-            if (close.Count != 0)
+            if (cmd.flags.ContainsKey("-close"))
             {
-                foreach (string name in close)
+                foreach (string name in cmd.flags["-close"])
                 {
                     tracker.destroyGui(plugin, container, name);
                 }
@@ -1015,14 +1043,21 @@ namespace Oxide.Plugins
         private void testCommand(BasePlayer player, string command, string[] args)
         {
             GuiContainer c = new GuiContainer(this, "test");
-            Rectangle testPos = new Rectangle(680, 579, 560, 53, 1920, 1080, true);
-            int fontsize = getFontsizeByFramesize(args[0].Length, testPos);
-            //int fontsize = getFontsizeByLength(args[0].Length, 22, 59);
-            player.ChatMessage(fontsize.ToString());
-            GuiText testText = new GuiText(args[0], fontsize, new GuiColor(0,0,0,1));
-            //c.addPanel("test", testPos, GuiContainer.Layer.hud, new GuiColor(1,1,1,1), text: testText);
-            c.addText("test", testPos, GuiContainer.Layer.hud , testText);
-            c.addPlainButton("close", new Rectangle(0.25f, 0.25f, 0.1f, 0.1f), GuiContainer.Layer.hud, new GuiColor("red"));
+            Rectangle pos = new Rectangle(0.25f, 0.25f, 0.5f, 0.5f);
+            c.Add(new CuiElement
+            {
+                Name = "test",
+                Components =
+                {
+                    new CuiImageComponent 
+                    { 
+                        Color = "0 1 0 0.5", 
+                        //Material = args[0]
+                        Sprite = args[0]
+                    },
+                    pos
+                },
+            });
             c.display(player);
         }
 
