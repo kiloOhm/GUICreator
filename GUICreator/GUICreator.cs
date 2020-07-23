@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "OHM", "1.2.6")]
+    [Info("GUICreator", "OHM", "1.2.7")]
     [Description("API Plugin for centralized GUI creation and management")]
     internal class GUICreator : RustPlugin
     {
@@ -26,6 +26,9 @@ namespace Oxide.Plugins
         {
             PluginInstance = this;
         }
+
+        public const int offsetResX = 1280;
+        public const int offsetResY = 720;
 
         #endregion global
 
@@ -72,7 +75,7 @@ namespace Oxide.Plugins
 
         #region classes
 
-        public class Rectangle : CuiRectTransformComponent
+        public class OldRectangle : CuiRectTransformComponent
         {
             public double anchorMinX;
             public double anchorMinY;
@@ -88,16 +91,14 @@ namespace Oxide.Plugins
             public double resY;
 
             bool topLeftOrigin;
-            //public string anchorMin => $"{anchorMinX} {anchorMinY}";
-            //public string anchorMax => $"{anchorMaxX} {anchorMaxY}";
 
-            public Rectangle()
+            public OldRectangle()
             {
                 AnchorMin = "0 0";
                 AnchorMax = "1 1";
             }
 
-            public Rectangle(double X, double Y, double W, double H, double resX = 1, double resY = 1, bool topLeftOrigin = false)
+            public OldRectangle(double X, double Y, double W, double H, double resX = 1, double resY = 1, bool topLeftOrigin = false)
             {
                 this.X = X;
                 this.Y = Y;
@@ -118,6 +119,95 @@ namespace Oxide.Plugins
 
                 AnchorMin = $"{anchorMinX} {anchorMinY}";
                 AnchorMax = $"{anchorMaxX} {anchorMaxY}";
+            }
+        }
+
+        public class Rectangle : CuiRectTransformComponent
+        {
+            public enum Anchors { BottomLeft = 0, BottomCenter, BottomRight, CenterLeft, Center, CenterRight, UpperLeft, UpperCenter, UpperRight }
+
+            double[,] AnchorData = new double[9, 4]
+            {
+                {0, 0, 0, 0 },
+                {0.5d, 0, 0.5d, 0 },
+                {1, 0, 1, 0 },
+                {0, 0.5d, 0, 0.5d },
+                {0.5d, 0.5d, 0.5d, 0.5d },
+                {1, 0.5d, 1, 0.5d },
+                {0, 1, 0, 1 },
+                {0.5d, 1, 0.5d, 1 },
+                {1, 1, 1, 1 }
+            };
+
+            string format = "0.##########";
+
+            public double anchorMinX;
+            public double anchorMinY;
+            public double anchorMaxX;
+            public double anchorMaxY;
+
+            public double fractionalMinX;
+            public double fractionalMinY;
+            public double fractionalMaxX;
+            public double fractionalMaxY;
+
+            public double offsetMinX;
+            public double offsetMinY;
+            public double offsetMaxX;
+            public double offsetMaxY;
+
+            public double X;
+            public double Y;
+            public double W;
+            public double H;
+
+            public double resX;
+            public double resY;
+
+            bool topLeftOrigin;
+
+            public Rectangle()
+            {
+                AnchorMin = "0, 0";
+                AnchorMax = "1, 1";
+            }
+
+            public Rectangle(double X, double Y, double W, double H, double resX = 1, double resY = 1, bool topLeftOrigin = false, Anchors anchor = Anchors.Center)
+            {
+                anchorMinX = AnchorData[(int)anchor, 0];
+                anchorMinY = AnchorData[(int)anchor, 1];
+                anchorMaxX = AnchorData[(int)anchor, 2];
+                anchorMaxY = AnchorData[(int)anchor, 3];
+
+                AnchorMin = $"{anchorMinX.ToString(format)} {anchorMinY.ToString(format)}";
+                AnchorMax = $"{anchorMaxX.ToString(format)} {anchorMaxY.ToString(format)}";
+
+                this.X = X;
+                this.Y = Y;
+                this.W = W;
+                this.H = H;
+
+                this.resX = resX;
+                this.resY = resY;
+
+                this.topLeftOrigin = topLeftOrigin;
+
+                double newY = topLeftOrigin ? resY - Y - H : Y;
+
+                fractionalMinX = X / resX;
+                fractionalMinY = newY / resY;
+                fractionalMaxX = (X + W) / resX;
+                fractionalMaxY = (newY + H) / resY;
+                //PluginInstance.PrintToChat($"{newY} + {H} / {resY} = {fractionalMaxY}");
+                //PluginInstance.PrintToChat($"{fractionalMinX} {fractionalMinY} : {fractionalMaxX} {fractionalMaxY}");
+                offsetMinX = -(anchorMinX - fractionalMinX) * offsetResX;
+                offsetMinY = -(anchorMinY - fractionalMinY) * offsetResY;
+                offsetMaxX = -(anchorMaxX - fractionalMaxX) * offsetResX;
+                offsetMaxY = -(anchorMaxY - fractionalMaxY) * offsetResY;
+                //PluginInstance.PrintToChat($"-({0.5d} - {fractionalMaxY} * {offsetResY} = {offsetMaxY}");
+
+                OffsetMin = $"{offsetMinX.ToString(format)} {offsetMinY.ToString(format)}";
+                OffsetMax = $"{offsetMaxX.ToString(format)} {offsetMaxY.ToString(format)}";
             }
         }
 
