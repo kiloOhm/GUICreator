@@ -13,7 +13,7 @@ namespace Oxide.Plugins
 {
     [Info("GUICreator", "OHM", "1.2.8")]
     [Description("API Plugin for centralized GUI creation and management")]
-    internal class GUICreator : RustPlugin
+    public class GUICreator : RustPlugin
     {
         #region global
 
