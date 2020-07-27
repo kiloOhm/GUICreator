@@ -11,9 +11,9 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "OHM", "1.2.8")]
+    [Info("GUICreator", "OHM", "1.2.9")]
     [Description("API Plugin for centralized GUI creation and management")]
-    public class GUICreator : RustPlugin
+    internal class GUICreator : RustPlugin
     {
         #region global
 
@@ -336,7 +336,7 @@ namespace Oxide.Plugins
 
             public string ToHex()
             {
-                return "#"+ColorUtility.ToHtmlStringRGBA(color);
+                return ColorUtility.ToHtmlStringRGBA(color);
             }
         }
 
@@ -388,12 +388,13 @@ namespace Oxide.Plugins
             //Rust UI elements (inventory, Health, etc.) are between the hud and the menu layer
             public static List<string> layers = new List<string> { "Overall", "Overlay", "Hud.Menu", "Hud", "Under" };
 
-            public enum Blur { slight, medium, strong, none };
+            public enum Blur { slight, medium, strong, greyout, none };
             public static List<string> blurs = new List<string>
             {
                 "assets/content/ui/uibackgroundblur-notice.mat",
                 "assets/content/ui/uibackgroundblur-ingamemenu.mat",
-                "assets/content/ui/uibackgroundblur.mat"
+                "assets/content/ui/uibackgroundblur.mat",
+                "assets/icons/greyout.mat"
             };
 
             public void display(BasePlayer player)
@@ -886,7 +887,8 @@ namespace Oxide.Plugins
             switch (type)
             {
                 case gametipType.gametip:
-                    container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.overall, new GuiColor("#25639BF0"), 0.5f, 1);
+                    //container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.overall, new GuiColor("#25639BF0"), 0.5f, 1);
+                    container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor("#25639BF4"), 0.5f, 1, GuiContainer.Blur.greyout);
                     container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.overall, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
                     container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "gameTipIcon", GuiContainer.Layer.overall, new GuiColor("#FFFFFFD9"), 0.5f, 1);
                     break;
@@ -898,7 +900,8 @@ namespace Oxide.Plugins
                     break;
 
                 case gametipType.error:
-                    container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.overall, new GuiColor("#BB0000F0"), 0.5f, 1);
+                    //container.addImage("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), "bgTex", GuiContainer.Layer.overall, new GuiColor("#BB0000F0"), 0.5f, 1);
+                    container.addPlainPanel("gametip", new Rectangle(375, 844, 1170, 58, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor("#BB0000F0"), 0.5f, 1, GuiContainer.Blur.greyout);
                     container.addText("gametip_txt", new Rectangle(433, 844, 1112, 58, 1920, 1080, true), GuiContainer.Layer.overall, new GuiText(text, 20, new GuiColor("#FFFFFFD9")), 0.5f, 1);
                     container.addImage("gametip_icon", new Rectangle(375, 844, 58, 58, 1920, 1080, true), "white_cross", GuiContainer.Layer.overall, new GuiColor("#FFFFFFD9"), 0.5f, 1);
                     break;
@@ -1302,20 +1305,31 @@ namespace Oxide.Plugins
                 container.addButton("demo_healButton", new Rectangle(0.5f, 0.5f, 0.25f, 0.25f), GuiContainer.Layer.hud, null, 1, 1, new GuiText("heal me", 40), heal, null, false, "flower");
                 Action<BasePlayer, string[]> hurt = (bPlayer, input) => { bPlayer.Hurt(10); };
                 container.addButton("demo_hurtButton", new Rectangle(0.5f, 0.25f, 0.25f, 0.25f), new GuiColor(1, 0, 0, 0.5f), 1, 1, new GuiText("hurt me", 40), hurt);
-                container.addText("demo_inputLabel", new Rectangle(0.375f, 0.85f, 0.25f, 0.1f), new GuiText("Print to chat:", 50), 1, 1);
+                container.addText("demo_inputLabel", new Rectangle(0.375f, 0.85f, 0.25f, 0.1f), new GuiText("Print to chat:", 30, null, TextAnchor.LowerCenter), 1, 1);
                 Action<BasePlayer, string[]> inputCallback = (bPlayer, input) => { PrintToChat(bPlayer, string.Concat(input)); };
                 container.addInput("demo_input", new Rectangle(0.375f, 0.75f, 0.25f, 0.1f), inputCallback, GuiContainer.Layer.hud, null, new GuiColor("white"), 100, new GuiText("", 50), 1, 1);
-                container.addButton("close", new Rectangle(0.1f, 0.1f, 0.1f, 0.1f), new GuiColor("red"), 1, 1, new GuiText("close", 50));
+                container.addButton("close", new Rectangle(0.1f, 0.1f, 0.1f, 0.1f), new GuiColor("red"), 1, 0, new GuiText("close", 50));
                 container.display(player);
 
                 GuiContainer container2 = new GuiContainer(this, "demo_child", "demo");
                 container2.addPanel("layer1", new Rectangle(1400, 800, 300, 100, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor("red"), 1, 1, new GuiText("overall", align: TextAnchor.LowerLeft));
-                container2.addPanel("layers_label", new Rectangle(0, 0, 1, 1), "layer1", null, 1, 1, new GuiText("Available layers:", 20, align: TextAnchor.UpperLeft));
+                container2.addPanel("layers_label", new Rectangle(1400, 800, 300, 100, 1920, 1080, true), GuiContainer.Layer.overall, null, 1, 1, new GuiText("Available layers:", 20, align: TextAnchor.UpperLeft));
                 container2.addPanel("layer2", new Rectangle(1425, 825, 300, 100, 1920, 1080, true), GuiContainer.Layer.overlay, new GuiColor("yellow"), 1, 1, new GuiText("overlay", align: TextAnchor.LowerLeft));
                 container2.addPanel("layer3", new Rectangle(1450, 850, 300, 100, 1920, 1080, true), GuiContainer.Layer.menu, new GuiColor("green"), 1, 1, new GuiText("menu", align: TextAnchor.LowerLeft));
                 container2.addPanel("layer4", new Rectangle(1475, 875, 300, 100, 1920, 1080, true), GuiContainer.Layer.hud, new GuiColor("blue"), 1, 1, new GuiText("hud", align: TextAnchor.LowerLeft));
                 container2.addPanel("layer5", new Rectangle(1500, 900, 300, 100, 1920, 1080, true), GuiContainer.Layer.under, new GuiColor("purple"), 1, 1, new GuiText("under", align: TextAnchor.LowerLeft));
                 container2.display(player);
+
+                GuiContainer container3 = new GuiContainer(this, "demo_anchors", "demo");
+                container3.addPlainPanel("bl", new Rectangle(20, 960, 100, 100, 1920, 1080, true, Rectangle.Anchors.BottomLeft), GuiContainer.Layer.menu, new GuiColor("white"), 1, 1);
+                container3.addPlainPanel("cl", new Rectangle(20, 490, 100, 100, 1920, 1080, true, Rectangle.Anchors.CenterLeft), GuiContainer.Layer.menu, new GuiColor("white"), 1, 1);
+                container3.addPlainPanel("ul", new Rectangle(20, 20, 100, 100, 1920, 1080, true, Rectangle.Anchors.UpperLeft), GuiContainer.Layer.menu, new GuiColor("white"), 1, 1);
+                container3.addPlainPanel("uc", new Rectangle(910, 20, 100, 100, 1920, 1080, true, Rectangle.Anchors.UpperCenter), GuiContainer.Layer.menu, new GuiColor("white"), 1, 1);
+                container3.addPlainPanel("ur", new Rectangle(1800, 20, 100, 100, 1920, 1080, true, Rectangle.Anchors.UpperRight), GuiContainer.Layer.menu, new GuiColor("white"), 1, 1);
+                container3.addPlainPanel("cr", new Rectangle(1800, 490, 100, 100, 1920, 1080, true, Rectangle.Anchors.CenterRight), GuiContainer.Layer.menu, new GuiColor("white"), 1, 1);
+                container3.addPlainPanel("br", new Rectangle(1800, 960, 100, 100, 1920, 1080, true, Rectangle.Anchors.BottomRight), GuiContainer.Layer.menu, new GuiColor("white"), 1, 1);
+                container3.addPlainPanel("bc", new Rectangle(910, 960, 100, 100, 1920, 1080, true, Rectangle.Anchors.BottomCenter), GuiContainer.Layer.menu, new GuiColor("white"), 1, 1);
+                container3.display(player);
 
                 customGameTip(player, "This is a custom gametip!", 5);
                 return;
