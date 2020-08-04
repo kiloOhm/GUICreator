@@ -5,6 +5,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="build\**" />
+    <EmbeddedResource Remove="build\**" />
+    <None Remove="build\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="ref\ImageLibrary.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ref\Oxide.References.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="0Harmony">
       <HintPath>ref\0Harmony.dll</HintPath>
     </Reference>
@@ -151,9 +165,6 @@
     </Reference>
     <Reference Include="Oxide.MySql">
       <HintPath>ref\Oxide.MySql.dll</HintPath>
-    </Reference>
-    <Reference Include="Oxide.References">
-      <HintPath>ref\Oxide.References.dll</HintPath>
     </Reference>
     <Reference Include="Oxide.Rust">
       <HintPath>ref\Oxide.Rust.dll</HintPath>
@@ -429,5 +440,9 @@
       <HintPath>ref\UnityEngine.XRModule.dll</HintPath>
     </Reference>
   </ItemGroup>
+
+  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="cd $(ProjectDir)&#xD;&#xA;del $(ProjectDir)build\$(ProjectName).cs&#xD;&#xA;copy $(ProjectDir)$(ProjectName).cs $(ProjectDir)build&#xD;&#xA;for /r $(ProjectDir)src %25%25F in (*.cs) do @type &quot;%25%25F&quot; &gt;&gt; $(ProjectDir)build\$(ProjectName).cs&#xD;&#xA;copy $(ProjectDir)build\$(ProjectName).cs C:\Users\Lukas\Desktop\rustserver\oxide\plugins" />
+  </Target>
 
 </Project>
