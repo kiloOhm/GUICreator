@@ -118,7 +118,7 @@
             {
                 foreach (GuiElement e in this)
                 {
-                    if (e.Name == parent)
+                    if (e.Name == name)
                     {
                         return e;
                     }
@@ -291,48 +291,46 @@
                 return elements;
             }
 
-            public void addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, Layer layer, string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
+            public List<GuiElement> addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, Layer layer, string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null, Blur blur = Blur.none)
             {
-                addInput(name, rectangle, callback, layers[(int)layer], close, panelColor, charLimit, text, FadeIn, FadeOut, isPassword, CursorEnabled, imgName);
+                return addInput(name, rectangle, callback, null, layer, close, panelColor, charLimit, text, FadeIn, FadeOut, isPassword, CursorEnabled, imgName, blur);
             }
 
-            public void addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
+            public List<GuiElement> addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null, Blur blur = Blur.none)
             {
-                //if (string.IsNullOrEmpty(name)) name = "input";
+                return addInput(name, rectangle, callback, GetParent(parent), Layer.hud, close, panelColor, charLimit, text, FadeIn, FadeOut, isPassword, CursorEnabled, imgName, blur);
+            }
 
-                //purgeDuplicates(name);
+            public List<GuiElement> addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, GuiElement parent, Layer layer, string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null, Blur blur = Blur.none)
+            {
+                if (string.IsNullOrEmpty(name)) name = "input";
 
-                //StringBuilder closeString = new StringBuilder("");
-                //if (close != null)
-                //{
-                //    closeString.Append(" --close ");
-                //    closeString.Append(close);
-                //}
+                purgeDuplicates(name);
 
-                //if (imgName != null || panelColor != null)
-                //{
-                //    this.addPanel(name, rectangle, parent, panelColor, FadeIn, FadeOut, null, imgName);
+                List<GuiElement> input = GuiInputField.GetNewGuiInputField(
+                    plugin, 
+                    this, 
+                    name, 
+                    rectangle, 
+                    callback, 
+                    parent, 
+                    layer, 
+                    close, 
+                    panelColor, 
+                    charLimit, 
+                    text, 
+                    FadeIn, 
+                    FadeOut, 
+                    isPassword, 
+                    CursorEnabled, 
+                    imgName, 
+                    blur);
 
-                //    this.Add(new CuiInputField()
-                //    {
-                //        InputField = { Align = text.Align, FontSize = text.FontSize, Color = text.Color, Command = $"gui.input {plugin.Name} {this.name} {removeWhiteSpaces(name)}{closeString.ToString()} --input", CharsLimit = charLimit, IsPassword = isPassword },
-                //        RectTransform = new Rectangle(),
-                //        CursorEnabled = CursorEnabled,
-                //        FadeOut = FadeOut
-                //    }, name, name + "_ipt");
-                //}
-                //else
-                //{
-                //    this.Add(new CuiInputField()
-                //    {
-                //        InputField = { Align = text.Align, FontSize = text.FontSize, Color = text.Color, Command = $"gui.input text {plugin.Name} {this.name} {removeWhiteSpaces(name)}{closeString.ToString()} --input", CharsLimit = charLimit, IsPassword = isPassword },
-                //        RectTransform = rectangle,
-                //        CursorEnabled = CursorEnabled,
-                //        FadeOut = FadeOut
-                //    }, parent, name);
-                //}
+                if (callback != null) this.registerCallback(name, callback);
 
-                //if (callback != null) this.registerCallback(name, callback);
+                AddRange(input);
+
+                return input;
             }
         }
     }

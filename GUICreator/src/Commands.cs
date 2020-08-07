@@ -69,9 +69,9 @@
             foreach (GuiContainer container in tracker.activeGuiContainers)
             {
                 SendReply(arg, $"Plugin: {container.plugin.Name}, Container: {container.name}, Parent: {container.parent}:");
-                foreach (CuiElement element in container)
+                foreach (GuiElement element in container)
                 {
-                    SendReply(arg, $"- Element: {element.Name}, Parent: {element.Parent}");
+                    SendReply(arg, $"- Element: {element.Name}, Parent: {element.Parent}, ParentElement: {element.ParentElement?.Name ?? "null"}");
                 }
             }
         }
@@ -101,7 +101,6 @@
 #if DEBUG
             player.ChatMessage(cmd.ToString());
 #endif
-
             Plugin plugin = Manager.GetPlugin(cmd.args[0]);
             if (plugin == null)
             {

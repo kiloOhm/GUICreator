@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "kOhm", "1.2.8")]
+    [Info("GUICreator", "kOhm", "1.3.0")]
     [Description("API Plugin for centralized GUI creation and management")]
     public partial class GUICreator : RustPlugin
     {
@@ -316,9 +316,9 @@ namespace Oxide.Plugins
             foreach (GuiContainer container in tracker.activeGuiContainers)
             {
                 SendReply(arg, $"Plugin: {container.plugin.Name}, Container: {container.name}, Parent: {container.parent}:");
-                foreach (CuiElement element in container)
+                foreach (GuiElement element in container)
                 {
-                    SendReply(arg, $"- Element: {element.Name}, Parent: {element.Parent}");
+                    SendReply(arg, $"- Element: {element.Name}, Parent: {element.Parent}, ParentElement: {element.ParentElement?.Name ?? "null"}");
                 }
             }
         }
@@ -348,7 +348,6 @@ namespace Oxide.Plugins
 #if DEBUG
             player.ChatMessage(cmd.ToString());
 #endif
-
             Plugin plugin = Manager.GetPlugin(cmd.args[0]);
             if (plugin == null)
             {
@@ -683,7 +682,7 @@ namespace Oxide.Plugins
             {
                 foreach (GuiElement e in this)
                 {
-                    if (e.Name == parent)
+                    if (e.Name == name)
                     {
                         return e;
                     }
@@ -856,48 +855,46 @@ namespace Oxide.Plugins
                 return elements;
             }
 
-            public void addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, Layer layer, string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
+            public List<GuiElement> addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, Layer layer, string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null, Blur blur = Blur.none)
             {
-                addInput(name, rectangle, callback, layers[(int)layer], close, panelColor, charLimit, text, FadeIn, FadeOut, isPassword, CursorEnabled, imgName);
+                return addInput(name, rectangle, callback, null, layer, close, panelColor, charLimit, text, FadeIn, FadeOut, isPassword, CursorEnabled, imgName, blur);
             }
 
-            public void addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
+            public List<GuiElement> addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null, Blur blur = Blur.none)
             {
-                //if (string.IsNullOrEmpty(name)) name = "input";
+                return addInput(name, rectangle, callback, GetParent(parent), Layer.hud, close, panelColor, charLimit, text, FadeIn, FadeOut, isPassword, CursorEnabled, imgName, blur);
+            }
 
-                //purgeDuplicates(name);
+            public List<GuiElement> addInput(string name, Rectangle rectangle, Action<BasePlayer, string[]> callback, GuiElement parent, Layer layer, string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null, Blur blur = Blur.none)
+            {
+                if (string.IsNullOrEmpty(name)) name = "input";
 
-                //StringBuilder closeString = new StringBuilder("");
-                //if (close != null)
-                //{
-                //    closeString.Append(" --close ");
-                //    closeString.Append(close);
-                //}
+                purgeDuplicates(name);
 
-                //if (imgName != null || panelColor != null)
-                //{
-                //    this.addPanel(name, rectangle, parent, panelColor, FadeIn, FadeOut, null, imgName);
+                List<GuiElement> input = GuiInputField.GetNewGuiInputField(
+                    plugin, 
+                    this, 
+                    name, 
+                    rectangle, 
+                    callback, 
+                    parent, 
+                    layer, 
+                    close, 
+                    panelColor, 
+                    charLimit, 
+                    text, 
+                    FadeIn, 
+                    FadeOut, 
+                    isPassword, 
+                    CursorEnabled, 
+                    imgName, 
+                    blur);
 
-                //    this.Add(new CuiInputField()
-                //    {
-                //        InputField = { Align = text.Align, FontSize = text.FontSize, Color = text.Color, Command = $"gui.input {plugin.Name} {this.name} {removeWhiteSpaces(name)}{closeString.ToString()} --input", CharsLimit = charLimit, IsPassword = isPassword },
-                //        RectTransform = new Rectangle(),
-                //        CursorEnabled = CursorEnabled,
-                //        FadeOut = FadeOut
-                //    }, name, name + "_ipt");
-                //}
-                //else
-                //{
-                //    this.Add(new CuiInputField()
-                //    {
-                //        InputField = { Align = text.Align, FontSize = text.FontSize, Color = text.Color, Command = $"gui.input text {plugin.Name} {this.name} {removeWhiteSpaces(name)}{closeString.ToString()} --input", CharsLimit = charLimit, IsPassword = isPassword },
-                //        RectTransform = rectangle,
-                //        CursorEnabled = CursorEnabled,
-                //        FadeOut = FadeOut
-                //    }, parent, name);
-                //}
+                if (callback != null) this.registerCallback(name, callback);
 
-                //if (callback != null) this.registerCallback(name, callback);
+                AddRange(input);
+
+                return input;
             }
         }
     }
@@ -1328,6 +1325,11 @@ namespace Oxide.Plugins
                 color.a = alpha;
             }
 
+            public void setAlpha(float alpha)
+            {
+                this.color.a = alpha;
+            }
+
             public GuiColor withAlpha(float alpha)
             {
                 this.color.a = alpha;
@@ -1470,17 +1472,17 @@ namespace Oxide.Plugins
         
             public Rectangle WithParent(Rectangle rectangle)
             {
-                if (rectangle == null) return this;
+                if (rectangle == null) return this; 
                 return new Rectangle(
-                    ((X/resX)*rectangle.resX) + rectangle.X,
-                    ((Y / resY) * rectangle.resY) + rectangle.Y + (!topLeftOrigin ? ((H / resY) * rectangle.H) : 0),
+                    ((X/resX)*rectangle.W) + rectangle.X,
+                    ((Y / resY) * rectangle.H) + rectangle.Y + (!topLeftOrigin ? ((H / resY) * rectangle.H) : 0),
                     (W/resX) * rectangle.W,
                     (H/resY) * rectangle.H,
                     rectangle.resX,
                     rectangle.resY,
                     rectangle.topLeftOrigin,
                     Anchor
-                    );
+                    );;
             }
         }
     }
@@ -1553,6 +1555,121 @@ namespace Oxide.Plugins
                         rectangle.WithParent(parent?.Rectangle)
                     }
                 };
+            }
+        }
+    }
+}﻿namespace Oxide.Plugins
+{
+    using Newtonsoft.Json;
+    using Oxide.Core.Plugins;
+    using Oxide.Game.Rust.Cui;
+    using System;
+    using System.Collections.Generic;
+    using System.Text;
+    using static Oxide.Plugins.GUICreator.GuiContainer;
+
+    public partial class GUICreator
+    {
+        [JsonObject(MemberSerialization.OptIn)]
+        public class GuiInputField : GuiElement
+        {
+            public List<GuiElement> Panel { get; set; }
+
+            public GuiText Text { get; set; }
+
+            public Action<BasePlayer, string[]> Callback { get; set; }
+
+            public GuiInputField() { }
+
+            public static List<GuiElement> GetNewGuiInputField(
+                Plugin plugin,
+                GuiContainer container,
+                string name, 
+                Rectangle rectangle, 
+                Action<BasePlayer, 
+                string[]> callback, 
+                GuiElement parent,
+                Layer layer, 
+                string close = null, 
+                GuiColor panelColor = null, 
+                int charLimit = 100, 
+                GuiText text = null, 
+                float FadeIn = 0, 
+                float FadeOut = 0, 
+                bool isPassword = false, 
+                bool CursorEnabled = true, 
+                string imgName = null,
+                Blur blur = Blur.none)
+            {
+                List<GuiElement> elements = new List<GuiElement>();
+
+                Layer higherLayer = layer;
+                if (parent != null) higherLayer = (Layer)Math.Min((int)layer, (int)parent.Layer);
+
+                StringBuilder closeString = new StringBuilder("");
+                if (close != null)
+                {
+                    closeString.Append(" --close ");
+                    closeString.Append(close);
+                }
+
+                if (text != null) text.FadeIn = FadeIn;
+
+                if (imgName != null || panelColor != null)
+                {
+                    elements.AddRange(
+                        GuiPanel.GetNewGuiPanel(
+                            plugin,
+                            name + "_label",
+                            rectangle,
+                            parent,
+                            layer,
+                            panelColor,
+                            FadeIn,
+                            FadeOut,
+                            null,
+                            imgName,
+                            blur
+                            ));
+                }
+
+                elements.Add(new GuiElement 
+                { 
+                    Name = name,
+                    Rectangle = rectangle.WithParent(parent?.Rectangle),
+                    Layer = higherLayer,
+                    Parent = layers[(int)higherLayer],
+                    FadeOut = FadeOut,
+                    ParentElement = parent,
+                    Components =
+                    {
+                        new CuiInputFieldComponent
+                        {
+                            Align = text.Align, 
+                            FontSize = text.FontSize, 
+                            Color = text.Color, 
+                            Command = $"gui.input {plugin.Name} {container.name} {removeWhiteSpaces(name)}{closeString} --input", 
+                            CharsLimit = charLimit, 
+                            IsPassword = isPassword
+                        },
+                        rectangle.WithParent(parent?.Rectangle)
+                    }
+                });
+
+                if (CursorEnabled)
+                {
+                    elements.Add(new GuiElement()
+                    {
+                        Name = name + "_cursor",
+                        Parent = name,
+                        Components =
+                        {
+                            new CuiNeedsCursorComponent()
+                        }
+                    });
+                }
+
+                return elements;
             }
         }
     }
@@ -1673,12 +1790,13 @@ namespace Oxide.Plugins
     using Oxide.Game.Rust.Cui;
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
+    using System.Runtime.CompilerServices;
     using System.Text;
     using static Oxide.Plugins.GUICreator.GuiContainer;
 
     public partial class GUICreator
     {
-
         [JsonObject(MemberSerialization.OptIn)]
         public class GuiPlainButton : GuiElement
         {
@@ -1729,6 +1847,7 @@ namespace Oxide.Plugins
                     Rectangle = rectangle.WithParent(parent?.Rectangle),
                     Layer = higherLayer,
                     Parent = layers[(int)higherLayer],
+                    ParentElement = parent,
                     FadeOut = fadeOut,
                     Components =
                     {

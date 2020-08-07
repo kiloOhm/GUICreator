@@ -117,6 +117,11 @@
                 color.a = alpha;
             }
 
+            public void setAlpha(float alpha)
+            {
+                this.color.a = alpha;
+            }
+
             public GuiColor withAlpha(float alpha)
             {
                 this.color.a = alpha;

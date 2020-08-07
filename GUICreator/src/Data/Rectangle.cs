@@ -100,17 +100,17 @@
         
             public Rectangle WithParent(Rectangle rectangle)
             {
-                if (rectangle == null) return this;
+                if (rectangle == null) return this; 
                 return new Rectangle(
-                    ((X/resX)*rectangle.resX) + rectangle.X,
-                    ((Y / resY) * rectangle.resY) + rectangle.Y + (!topLeftOrigin ? ((H / resY) * rectangle.H) : 0),
+                    ((X/resX)*rectangle.W) + rectangle.X,
+                    ((Y / resY) * rectangle.H) + rectangle.Y + (!topLeftOrigin ? ((H / resY) * rectangle.H) : 0),
                     (W/resX) * rectangle.W,
                     (H/resY) * rectangle.H,
                     rectangle.resX,
                     rectangle.resY,
                     rectangle.topLeftOrigin,
                     Anchor
-                    );
+                    );;
             }
         }
     }

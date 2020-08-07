@@ -5,38 +5,40 @@
     using Oxide.Game.Rust.Cui;
     using System;
     using System.Collections.Generic;
-    using System.ComponentModel;
-    using System.Runtime.CompilerServices;
     using System.Text;
     using static Oxide.Plugins.GUICreator.GuiContainer;
 
     public partial class GUICreator
     {
         [JsonObject(MemberSerialization.OptIn)]
-        public class GuiPlainButton : GuiElement
+        public class GuiInputField : GuiElement
         {
+            public List<GuiElement> Panel { get; set; }
+
             public GuiText Text { get; set; }
 
             public Action<BasePlayer, string[]> Callback { get; set; }
 
-            public GuiLabel Label { get; set; }
+            public GuiInputField() { }
 
-            public GuiPlainButton() { }
-
-            public static List<GuiElement> GetNewGuiPlainButton(
-                Plugin plugin, 
-                GuiContainer container, 
+            public static List<GuiElement> GetNewGuiInputField(
+                Plugin plugin,
+                GuiContainer container,
                 string name, 
                 Rectangle rectangle, 
-                GuiElement parent = null, 
-                Layer layer = Layer.hud, 
-                GuiColor panelColor = null, 
-                float fadeIn = 0, 
-                float fadeOut = 0, 
-                GuiText text = null, 
-                Action<BasePlayer, string[]> callback = null, 
+                Action<BasePlayer, 
+                string[]> callback, 
+                GuiElement parent,
+                Layer layer, 
                 string close = null, 
+                GuiColor panelColor = null, 
+                int charLimit = 100, 
+                GuiText text = null, 
+                float FadeIn = 0, 
+                float FadeOut = 0, 
+                bool isPassword = false, 
                 bool CursorEnabled = true, 
+                string imgName = null,
                 Blur blur = Blur.none)
             {
                 List<GuiElement> elements = new List<GuiElement>();
@@ -51,47 +53,48 @@
                     closeString.Append(close);
                 }
 
-                string materialString = "Assets/Icons/IconMaterial.mat";
-                if (blur != Blur.none) materialString = blurs[(int)blur];
+                if (text != null) text.FadeIn = FadeIn;
 
-                if (text != null) text.FadeIn = fadeIn;
-
-                GuiPlainButton button = new GuiPlainButton
+                if (imgName != null || panelColor != null)
                 {
+                    elements.AddRange(
+                        GuiPanel.GetNewGuiPanel(
+                            plugin,
+                            name + "_label",
+                            rectangle,
+                            parent,
+                            layer,
+                            panelColor,
+                            FadeIn,
+                            FadeOut,
+                            null,
+                            imgName,
+                            blur
+                            ));
+                }
+
+                elements.Add(new GuiElement 
+                { 
                     Name = name,
                     Rectangle = rectangle.WithParent(parent?.Rectangle),
                     Layer = higherLayer,
                     Parent = layers[(int)higherLayer],
+                    FadeOut = FadeOut,
                     ParentElement = parent,
-                    FadeOut = fadeOut,
                     Components =
                     {
-                        new CuiButtonComponent {
-                            Command = $"gui.input {plugin.Name} {container.name} {removeWhiteSpaces(name)}{closeString}", 
-                            FadeIn = fadeIn, 
-                            Color = panelColor?.getColorString() ?? "0 0 0 0", 
-                            Material = materialString},
-                        rectangle.WithParent(parent?.Rectangle)
-                    },
-                    Label = new GuiLabel
-                    {
-                        Name = name + "_txt",
-                        Rectangle = new Rectangle(),
-                        Layer = higherLayer,
-                        Parent = name,
-                        Text = text,
-                        FadeOut = fadeOut,
-                        Components =
+                        new CuiInputFieldComponent
                         {
-                            text,
-                            new Rectangle()
-                        }
+                            Align = text.Align, 
+                            FontSize = text.FontSize, 
+                            Color = text.Color, 
+                            Command = $"gui.input {plugin.Name} {container.name} {removeWhiteSpaces(name)}{closeString} --input", 
+                            CharsLimit = charLimit, 
+                            IsPassword = isPassword
+                        },
+                        rectangle.WithParent(parent?.Rectangle)
                     }
-                };
-
-                elements.Add(button);
-
-                elements.Add(button.Label);
+                });
 
                 if (CursorEnabled)
                 {
