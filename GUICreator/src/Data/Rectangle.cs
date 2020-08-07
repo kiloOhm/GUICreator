@@ -100,6 +100,7 @@
         
             public Rectangle WithParent(Rectangle rectangle)
             {
+                if (rectangle == null) return this;
                 return new Rectangle(
                     ((X/resX)*rectangle.W) + rectangle.X,
                     ((Y / resY) * rectangle.H) + rectangle.Y + ((!topLeftOrigin && rectangle.topLeftOrigin) ? ((H / resY) * rectangle.H) : 0),
