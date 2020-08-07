@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "kOhm", "1.3.0")]
+    [Info("GUICreator", "kOhm", "1.3.1")]
     [Description("API Plugin for centralized GUI creation and management")]
     public partial class GUICreator : RustPlugin
     {
@@ -1021,7 +1021,7 @@ namespace Oxide.Plugins
                 GuiElement target = null;
                 foreach (GuiElement element in container)
                 {
-                    if (element.Parent == name)
+                    if (element.Parent == name || element.ParentElement?.Name == name)
                     {
                         CuiHelper.DestroyUi(player, element.Name);
                         garbage.Add(element);
@@ -1472,10 +1472,9 @@ namespace Oxide.Plugins
         
             public Rectangle WithParent(Rectangle rectangle)
             {
-                if (rectangle == null) return this; 
                 return new Rectangle(
                     ((X/resX)*rectangle.W) + rectangle.X,
-                    ((Y / resY) * rectangle.H) + rectangle.Y + (!topLeftOrigin ? ((H / resY) * rectangle.H) : 0),
+                    ((Y / resY) * rectangle.H) + rectangle.Y + ((!topLeftOrigin && rectangle.topLeftOrigin) ? ((H / resY) * rectangle.H) : 0),
                     (W/resX) * rectangle.W,
                     (H/resY) * rectangle.H,
                     rectangle.resX,
@@ -1876,7 +1875,7 @@ namespace Oxide.Plugins
 
                 elements.Add(button);
 
-                elements.Add(button.Label);
+                if(text != null) elements.Add(button.Label);
 
                 if (CursorEnabled)
                 {

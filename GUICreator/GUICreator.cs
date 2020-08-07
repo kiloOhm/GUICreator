@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "kOhm", "1.3.0")]
+    [Info("GUICreator", "kOhm", "1.3.1")]
     [Description("API Plugin for centralized GUI creation and management")]
     public partial class GUICreator : RustPlugin
     {

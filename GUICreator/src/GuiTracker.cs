@@ -121,7 +121,7 @@
                 GuiElement target = null;
                 foreach (GuiElement element in container)
                 {
-                    if (element.Parent == name)
+                    if (element.Parent == name || element.ParentElement?.Name == name)
                     {
                         CuiHelper.DestroyUi(player, element.Name);
                         garbage.Add(element);

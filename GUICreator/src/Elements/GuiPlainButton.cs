@@ -91,7 +91,7 @@
 
                 elements.Add(button);
 
-                elements.Add(button.Label);
+                if(text != null) elements.Add(button.Label);
 
                 if (CursorEnabled)
                 {
