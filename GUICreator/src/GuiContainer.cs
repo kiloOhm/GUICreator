@@ -255,7 +255,6 @@
                  
                 if (imgName != null)
                 {
-                    PluginInstance.PrintToChat("test");
                     elements.Add(addImage(name + "_img", rectangle, imgName, parent, layer, panelColor, FadeIn, FadeOut));
                     elements.AddRange(addPlainButton(name + "_btn", rectangle, parent, layer, new GuiColor(0,0,0,0), FadeIn, FadeOut, text, callback, close, CursorEnabled));
                 }

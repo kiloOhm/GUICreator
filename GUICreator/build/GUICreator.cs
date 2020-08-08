@@ -265,36 +265,6 @@ namespace Oxide.Plugins
             cmd.AddChatCommand("guidemo", this, nameof(demoCommand));
             cmd.AddChatCommand("img", this, nameof(imgPreviewCommand));
             cmd.AddChatCommand("imgraw", this, nameof(imgrawPreviewCommand));
-            cmd.AddChatCommand("test", this, nameof(TestCommand));
-        }
-
-        private void TestCommand(BasePlayer player, string command, string[] args)
-        {
-            GuiContainer c = new GuiContainer(this, "test");
-
-            GuiPlainPanel pp = c.addPlainPanel("outside", new Rectangle(400, 300, 500, 300, 1920, 1080, true), GuiContainer.Layer.menu, new GuiColor("white").withAlpha(0.2f));
-            PluginInstance.PrintToChat($"pp: X={pp.Rectangle.X}, Y={pp.Rectangle.Y}, W={pp.Rectangle.W}, H={pp.Rectangle.H}");
-            PluginInstance.PrintToChat($"pp: {pp.Rectangle.AnchorMin} {pp.Rectangle.OffsetMin} / {pp.Rectangle.AnchorMax} {pp.Rectangle.OffsetMax}");
-            List<GuiElement> pb = c.addButton(
-                "button",
-                new Rectangle(0, 0, 500, 500, 1920, 1080, true),
-                pp,
-                GuiContainer.Layer.hud,
-                new GuiColor("red").withAlpha(0.6f), 
-                0, 
-                0,
-                new GuiText("button"),
-                (p, a) => { PluginInstance.PrintToChat("test"); }, 
-                null, 
-                true, 
-                "flower",
-                GuiContainer.Blur.strong);
-            PluginInstance.PrintToChat($"pb: X={pb[0].Rectangle.X}, Y={pb[0].Rectangle.Y}, W={pb[0].Rectangle.W}, H={pb[0].Rectangle.H}");
-            PluginInstance.PrintToChat($"pb: {pb[0].Rectangle.AnchorMin} {pb[0].Rectangle.OffsetMin} / {pb[0].Rectangle.AnchorMax} {pb[0].Rectangle.OffsetMax}");
-            //List<GuiElement> panel = c.addPanel("panel", new Rectangle(0, 0, 0.5f, 0.5f), pp, GuiContainer.Layer.hud, new GuiColor("white").withAlpha(0.6f), 0, 0, new GuiText("test"), "flower", GuiContainer.Blur.medium);
-            //PluginInstance.PrintToChat($"panel: X={panel[0].Rectangle.X}, Y={panel[0].Rectangle.Y}, W={panel[0].Rectangle.W}, H={panel[0].Rectangle.H}");
-            //PluginInstance.PrintToChat($"panel: {panel[0].Rectangle.AnchorMin} {panel[0].Rectangle.OffsetMin} / {panel[0].Rectangle.AnchorMax} {panel[0].Rectangle.OffsetMax}");
-            c.display(player);
         }
 
         private void closeUi(ConsoleSystem.Arg arg)
@@ -819,7 +789,6 @@ namespace Oxide.Plugins
                  
                 if (imgName != null)
                 {
-                    PluginInstance.PrintToChat("test");
                     elements.Add(addImage(name + "_img", rectangle, imgName, parent, layer, panelColor, FadeIn, FadeOut));
                     elements.AddRange(addPlainButton(name + "_btn", rectangle, parent, layer, new GuiColor(0,0,0,0), FadeIn, FadeOut, text, callback, close, CursorEnabled));
                 }
