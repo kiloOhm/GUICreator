@@ -120,24 +120,24 @@ namespace Oxide.Plugins
             containerGUI.display(player);
         }
 
-        public void dropdown(BasePlayer player, List<string> options, Rectangle rectangle, string parent, Action<string> callback, bool allowNew = false, int page = 0, Predicate<string> predicate = null)
+        public void dropdown(Plugin plugin, BasePlayer player, List<string> options, Rectangle rectangle, GuiContainer.Layer layer, string parent, GuiColor panelColor, GuiColor textColor, Action<string> callback, bool allowNew = false, int page = 0, Predicate<string> predicate = null)
         {
             if (allowNew) options.Add("(add new)");
             int maxItems = 5;
             List<List<string>> ListOfLists = SplitIntoChunks<string>(options, maxItems);
-            GuiContainer container = new GuiContainer(this, "dropdown", parent);
-            container.addPlainPanel("dropdown_background", rectangle, GuiContainer.Layer.menu, new GuiColor(0, 0, 0, 0.6f), 0, 0, GuiContainer.Blur.medium);
+            GuiContainer container = new GuiContainer(plugin, "dropdown_API", parent);
+            container.addPlainPanel("dropdown_background", rectangle, GuiContainer.Layer.menu, new GuiColor(0,0,0,0), 0, 0, GuiContainer.Blur.medium);
 
             double cfX = rectangle.W / 300;
             double cfY = rectangle.H / 570;
 
             Action<BasePlayer, string[]> up = (bPlayer, input) =>
             {
-                dropdown(player, options, rectangle, parent, callback, allowNew, page - 1, predicate);
+                dropdown(plugin, player, options, rectangle, layer, parent, panelColor, textColor, callback, allowNew, page - 1, predicate);
             };
             Action<BasePlayer, string[]> down = (bPlayer, input) =>
             {
-                dropdown(player, options, rectangle, parent, callback, allowNew, page + 1, predicate);
+                dropdown(plugin, player, options, rectangle, layer, parent, panelColor, textColor, callback, allowNew, page + 1, predicate);
             };
             if (page > 0) container.addPlainButton("dropdown_up", new Rectangle(0, 1, 298, 36, 300, 570, true), new GuiColor(1, 1, 1, 0.4f), 0, 0, new GuiText("<b>∧</b>", (int)Math.Floor(22 * cfY), new GuiColor("black")), up, parent: "dropdown_background");
             if (page < ListOfLists.Count - 1) container.addPlainButton("dropdown_up", new Rectangle(0, 533, 298, 37, 300, 570, true), new GuiColor(1, 1, 1, 0.4f), 0, 0, new GuiText("<b>∨</b>", (int)Math.Floor(22 * cfY), new GuiColor("black")), down, parent: "dropdown_background");
@@ -145,13 +145,13 @@ namespace Oxide.Plugins
             int count = 0;
             foreach (string option in ListOfLists[page])
             {
-                Rectangle pos = new Rectangle(10, 40 + count * 100, 280, 90, 300, 570, true); ;
-                Rectangle absPos = new Rectangle(rectangle.X + (pos.X * cfX), rectangle.Y + (pos.Y * cfY), pos.W * cfX, pos.H * cfY, 1920, 1080, true);
+                int hEach = (int)(rectangle.H / ListOfLists[page].Count);
+                Rectangle pos = new Rectangle(0, 0 + (count*hEach), rectangle.W, hEach, rectangle.W, rectangle.H, true).WithParent(rectangle);
 
                 Action<BasePlayer, string[]> btnCallback = null;
                 if (option == "(add new)")
                 {
-                    btnCallback = (bPlayer, input) => dropdownAddNew(player, absPos, callback, predicate);
+                    btnCallback = (bPlayer, input) => dropdownAddNew(plugin, player, pos, callback, predicate);
                 }
                 else
                 {
@@ -161,16 +161,16 @@ namespace Oxide.Plugins
                         callback(selected);
                     };
                 }
-                container.addPlainButton($"dropdown_option_{option}", pos, new GuiColor(0, 0, 0, 0.7f), 0, 0, new GuiText(option, color: new GuiColor(1, 1, 1, 0.5f)), btnCallback, parent: "dropdown_background");
+                container.addPlainButton($"dropdown_option_{option}", pos, layer, panelColor, 0, 0, new GuiText(option, color: textColor), btnCallback, blur: GuiContainer.Blur.strong);
                 count++;
             }
 
             container.display(player);
         }
 
-        public void dropdownAddNew(BasePlayer player, Rectangle rectangle, Action<string> callback, Predicate<string> predicate)
+        public void dropdownAddNew(Plugin plugin, BasePlayer player, Rectangle rectangle, Action<string> callback, Predicate<string> predicate)
         {
-            GuiContainer container = new GuiContainer(this, "dropdown_addNew", "dropdown");
+            GuiContainer container = new GuiContainer(this, "dropdown_addNew", "dropdown_API");
             Action<BasePlayer, string[]> inputCallback = (bPlayer, input) =>
             {
                 if (input.Length == 0) return;
@@ -189,7 +189,7 @@ namespace Oxide.Plugins
                     if (!predicate(newName.ToString()))
                     {
                         prompt(player, "Your input is invalid!", "INVALID INPUT");
-                        dropdownAddNew(player, rectangle, callback, predicate);
+                        dropdownAddNew(plugin, player, rectangle, callback, predicate);
                         return;
                     }
                 }
