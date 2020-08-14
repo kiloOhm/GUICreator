@@ -75,17 +75,48 @@ namespace Oxide.Plugins
             container.display(player);
         }
 
-        public void prompt(BasePlayer player, string message, string header)
+        public void prompt(BasePlayer player, string header, string msg, Action<BasePlayer, string[]> Callback = null)
         {
-            Action<BasePlayer, string[]> closeCallback = (bPlayer, input) =>
-            {
-                GuiTracker.getGuiTracker(player).destroyGui(PluginInstance, "gametip");
-            };
             GuiContainer containerGUI = new GuiContainer(this, "prompt");
-            containerGUI.addPlainPanel("background", new Rectangle(700, 377, 520, 243, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.6f), 0.1f, 0.1f, GuiContainer.Blur.medium);
-            containerGUI.addPanel("msg", new Rectangle(755, 469, 394, 56, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(message, 10, new GuiColor(255, 255, 255, 0.8f)));
-            containerGUI.addPanel("header", new Rectangle(800, 404, 318, 56, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(header, 25, new GuiColor(255, 255, 255, 0.8f)));
-            containerGUI.addPlainButton("close", new Rectangle(802, 536, 318, 56, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(65, 33, 32, 0.8f), 0.1f, 0.1f, new GuiText("CLOSE", 20, new GuiColor(162, 51, 46, 0.8f)), closeCallback);
+            containerGUI.addPlainButton("close", new Rectangle(), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.3f), 0.1f, 0.1f, blur: GuiContainer.Blur.medium);
+            containerGUI.addPlainPanel("background", new Rectangle(710, 390, 500, 300, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.6f), 0.1f, 0.1f, GuiContainer.Blur.medium);
+            containerGUI.addPanel("header", new Rectangle(710, 390, 500, 60, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(header, 25, new GuiColor(1, 1, 1, 0.7f)));
+            containerGUI.addPanel("msg", new Rectangle(735, 450, 450, 150, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(msg, 10, new GuiColor(1, 1, 1, 0.7f)));
+            containerGUI.addPlainButton("ok", new Rectangle(860, 520, 200, 50, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 1, 0.6f), 0.1f, 0.1f, new GuiText("OK", 20, new GuiColor(1, 1, 1, 0.7f)), Callback, "prompt");
+            containerGUI.display(player);
+        }
+
+        public void BigConfirmPrompt(BasePlayer player, string header, string msg, Action<BasePlayer, string[]> yesCallback, Action<BasePlayer, string[]> noCallback)
+        {
+            GuiContainer containerGUI = new GuiContainer(this, "prompt");
+            containerGUI.addPlainButton("close", new Rectangle(), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.3f), 0.1f, 0.1f, callback: noCallback, blur: GuiContainer.Blur.medium);
+            containerGUI.addPlainPanel("background", new Rectangle(710, 390, 500, 300, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.6f), 0.1f, 0.1f, GuiContainer.Blur.medium);
+            containerGUI.addPanel("header", new Rectangle(710, 390, 500, 60, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(header, 25, new GuiColor(1, 1, 1, 0.7f)));
+            containerGUI.addPanel("msg", new Rectangle(735, 450, 450, 150, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(msg, 10, new GuiColor(1, 1, 1, 0.7f)));
+            containerGUI.addPlainButton("yes", new Rectangle(740, 620, 200, 50, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 1, 0, 0.6f), 0.1f, 0.1f, new GuiText("YES", 20, new GuiColor(1, 1, 1, 0.7f)), yesCallback, "prompt");
+            containerGUI.addPlainButton("no", new Rectangle(980, 620, 200, 50, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(1, 0, 0, 0.6f), 0.1f, 0.1f, new GuiText("NO", 20, new GuiColor(1, 1, 1, 0.7f)), noCallback, "prompt");
+            containerGUI.display(player);
+        }
+
+        public void SmallConfirmPrompt(BasePlayer player, string header, Action<BasePlayer, string[]> yesCallback, Action<BasePlayer, string[]> noCallback)
+        {
+            GuiContainer containerGUI = new GuiContainer(this, "prompt");
+            containerGUI.addPlainButton("close", new Rectangle(), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.3f), 0.1f, 0.1f, callback: noCallback, blur: GuiContainer.Blur.medium);
+            containerGUI.addPlainPanel("background", new Rectangle(710, 465, 500, 150, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.6f), 0.1f, 0.1f, GuiContainer.Blur.medium);
+            containerGUI.addPanel("header", new Rectangle(710, 465, 500, 60, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(header, 25, new GuiColor(1, 1, 1, 0.7f)));
+            containerGUI.addPlainButton("yes", new Rectangle(740, 545, 200, 50, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 1, 0, 0.6f), 0.1f, 0.1f, new GuiText("YES", 20, new GuiColor(1, 1, 1, 0.7f)), yesCallback, "prompt");
+            containerGUI.addPlainButton("no", new Rectangle(980, 545, 200, 50, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(1, 0, 0, 0.6f), 0.1f, 0.1f, new GuiText("NO", 20, new GuiColor(1, 1, 1, 0.7f)), noCallback, "prompt");
+            containerGUI.display(player);
+        }
+
+        public void SubmitPrompt(BasePlayer player, string header, Action<BasePlayer, string[]> inputCallback)
+        {
+            GuiContainer containerGUI = new GuiContainer(this, "prompt");
+            containerGUI.addPlainButton("close", new Rectangle(), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.3f), 0.1f, 0.1f, blur: GuiContainer.Blur.medium);
+            containerGUI.addPlainPanel("background", new Rectangle(710, 425, 500, 230, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.6f), 0.1f, 0.1f, GuiContainer.Blur.medium);
+            containerGUI.addPanel("header", new Rectangle(710, 435, 500, 60, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(header, 25, new GuiColor(1, 1, 1, 0.7f)));
+            containerGUI.addInput("input", new Rectangle(735, 505, 450, 60, 1920, 1080, true), inputCallback, GuiContainer.Layer.overall, "prompt", new GuiColor(1, 1, 1, 1), 100, new GuiText("", 14, new GuiColor(0, 0, 0, 1)), 0.1f, 0.1f);
+            containerGUI.addPlainButton("submit", new Rectangle(860, 583, 200, 50, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(1, 0, 0, 0.6f), 0.1f, 0.1f, new GuiText("SUBMIT", 20, new GuiColor(1, 1, 1, 0.7f)), close: "prompt");
             containerGUI.display(player);
         }
 
