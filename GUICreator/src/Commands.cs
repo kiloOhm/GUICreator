@@ -106,7 +106,8 @@
             {
                 foreach (string name in cmd.flags["-close"])
                 {
-                    tracker.destroyGui(plugin, container, name);
+                    if (name == container.name) tracker.destroyGui(plugin, container);
+                    else tracker.destroyGui(plugin, container, name);
                 }
             }
 

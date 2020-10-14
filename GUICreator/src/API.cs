@@ -82,14 +82,28 @@
             containerGUI.display(player);
         }
 
-        public void SubmitPrompt(BasePlayer player, string header, Action<BasePlayer, string[]> inputCallback)
+        private class Submission
+        {
+            public string Input { get; set; } = null;
+        }
+
+        public void SubmitPrompt(BasePlayer player, string header, Action<BasePlayer, string> inputCallback)
         {
             GuiContainer containerGUI = new GuiContainer(this, "prompt");
             containerGUI.addPlainButton("close", new Rectangle(), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.3f), 0.1f, 0.1f, blur: GuiContainer.Blur.medium);
             containerGUI.addPlainPanel("background", new Rectangle(710, 425, 500, 230, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.6f), 0.1f, 0.1f, GuiContainer.Blur.medium);
             containerGUI.addPanel("header", new Rectangle(710, 435, 500, 60, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(header, 25, new GuiColor(1, 1, 1, 0.7f)));
-            containerGUI.addInput("input", new Rectangle(735, 505, 450, 60, 1920, 1080, true), inputCallback, GuiContainer.Layer.overall, "prompt", new GuiColor(1, 1, 1, 1), 100, new GuiText("", 14, new GuiColor(0, 0, 0, 1)), 0.1f, 0.1f);
-            containerGUI.addPlainButton("submit", new Rectangle(860, 583, 200, 50, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(1, 0, 0, 0.6f), 0.1f, 0.1f, new GuiText("SUBMIT", 20, new GuiColor(1, 1, 1, 0.7f)), close: "prompt");
+            Submission submission = new Submission();
+            Action< BasePlayer, string[]> inputFieldCallback = (p, a) =>
+            {
+                submission.Input = string.Join(" ", a);
+            };
+            containerGUI.addInput("input", new Rectangle(735, 505, 450, 60, 1920, 1080, true), inputFieldCallback, GuiContainer.Layer.overall, null, new GuiColor(1, 1, 1, 1), 100, new GuiText("", 14, new GuiColor(0, 0, 0, 1)), 0.1f, 0.1f);
+            Action<BasePlayer, string[]> cb = (p, a) =>
+            {
+                inputCallback(p, submission.Input);
+            };
+            containerGUI.addPlainButton("submit", new Rectangle(860, 583, 200, 50, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(1, 0, 0, 0.6f), 0.1f, 0.1f, new GuiText("SUBMIT", 20, new GuiColor(1, 1, 1, 0.7f)), cb, "prompt");
             containerGUI.display(player);
         }
 
