@@ -15,9 +15,15 @@
             cmd.AddConsoleCommand("gui.input", this, nameof(OnGuiInput));
             cmd.AddConsoleCommand("gui.list", this, nameof(listContainers));
 
+            cmd.AddChatCommand("player", this, nameof(PlayerSearchCommand));
             cmd.AddChatCommand("guidemo", this, nameof(demoCommand));
             cmd.AddChatCommand("img", this, nameof(imgPreviewCommand));
             cmd.AddChatCommand("imgraw", this, nameof(imgrawPreviewCommand));
+        }
+
+        private void PlayerSearchCommand(BasePlayer player, string command, string[] args)
+        {
+            PlayerSearch(player, args[0], (p) => player.ChatMessage($"player selected: {p.displayName}"));
         }
 
         private void closeUi(ConsoleSystem.Arg arg)

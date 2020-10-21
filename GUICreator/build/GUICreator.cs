@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "kOhm", "1.3.1")]
+    [Info("GUICreator", "kOhm", "1.4.0")]
     [Description("API Plugin for centralized GUI creation and management")]
     public partial class GUICreator : RustPlugin
     {
@@ -30,6 +30,7 @@ namespace Oxide.Plugins
     using Oxide.Core.Plugins;
     using System;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Text;
 
     public partial class GUICreator
@@ -75,13 +76,140 @@ namespace Oxide.Plugins
             container.display(player);
         }
 
+        public void PlayerSearch(BasePlayer player, string name, Action<BasePlayer> callback, int page = 0)
+        {
+            if (string.IsNullOrEmpty(name)) return;
+            ulong id;
+            ulong.TryParse(name, out id);
+            List<BasePlayer> results = BasePlayer.allPlayerList.Where((p) => p.displayName.ToUpper().Contains(name.ToUpper()) || p.userID == id).ToList();
+
+            if(results == null || results.Count == 0)
+            {
+                prompt(player, "Player search", "No players found!");
+                return;
+            }
+
+            Action<PlayerSummary[]> cb = (pss) =>
+            {
+                var help = new List<KeyValuePair<BasePlayer, PlayerSummary>>();
+                foreach(PlayerSummary ps in pss)
+                {
+                    help.Add( new KeyValuePair<BasePlayer, PlayerSummary>(results.Find(p => p.UserIDString == ps.steamid), ps));
+                }
+                SendPlayerSearchUI(player, help.ToArray(), callback);
+            };
+            GetSteamUserData(results.Select(p => p.userID).ToList(), cb);
+        }
+
+        public void SendPlayerSearchUI(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary>[] results, Action<BasePlayer> callback, int page = 0)
+        {
+            List<List<KeyValuePair<BasePlayer, PlayerSummary>>> listOfLists = SplitIntoChunks(results.ToList(), 5);
+
+            GuiContainer c = new GuiContainer(PluginInstance, "PlayerSearch");
+            //clickout
+            c.addPlainButton("close", new Rectangle(), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.3f), 0.1f, 0.1f, blur: GuiContainer.Blur.medium);
+
+            GuiColor black60 = new GuiColor(0, 0, 0, 0.6f);
+            GuiColor black40 = new GuiColor(0, 0, 0, 0.4f);
+            GuiColor white70 = new GuiColor(1, 1, 1, 0.7f);
+
+            //background
+            Rectangle bgPos = new Rectangle(710, 260, 500, 560, 1920, 1080, true);
+            c.addPlainPanel("background", bgPos, GuiContainer.Layer.overall, black60, 0.2f, 0, GuiContainer.Blur.medium);
+            c.addPlainPanel("background2", bgPos, GuiContainer.Layer.overall, black60, 0.2f, 0, GuiContainer.Blur.greyout);
+
+            //header
+            Rectangle headerPos = new Rectangle(710, 260, 500, 60, 1920, 1080, true);
+            GuiText headerText = new GuiText("Players found:", 20, white70);
+            c.addText("header", headerPos, GuiContainer.Layer.overall, headerText, 0.2f, 0);
+
+            //navigators
+            if (page != 0)
+            {
+                //up
+                Rectangle upPos = new Rectangle(945, 325, 30, 30, 1920, 1080, true);
+                Action<BasePlayer, string[]> upCb = (p, a) =>
+                {
+                    SendPlayerSearchUI(player, results, callback, page - 1);
+                };
+                c.addButton("upbtn", upPos, GuiContainer.Layer.overall, white70, 0.2f, 0, callback: upCb, imgName: "triangle_up");
+            }
+            if (page != listOfLists.Count - 1)
+            {
+                //down
+                Rectangle downPos = new Rectangle(945, 785, 30, 30, 1920, 1080, true);
+                Action<BasePlayer, string[]> downCb = (p, a) =>
+                {
+                    SendPlayerSearchUI(player, results, callback, page + 1);
+                };
+                c.addButton("downbtn", downPos, GuiContainer.Layer.overall, white70, 0.2f, 0, callback: downCb, imgName: "triangle_down");
+            }
+
+            c.display(player);
+
+            //entries
+            int count = 0;
+            int sizeEach = 80;
+            int gap = 5;
+            foreach (KeyValuePair<BasePlayer, PlayerSummary> kvp in listOfLists[page])
+            {
+                int ccount = count;
+                int csizeEach = sizeEach;
+                int cgap = gap;
+                Action imageCb = () =>
+                {
+                    SendEntry(player, kvp, ccount, csizeEach, cgap, callback);
+                };
+                registerImage(PluginInstance, kvp.Key.UserIDString, kvp.Value.avatarfull, imageCb);
+                count++;
+            }
+        }
+
+        public void SendEntry(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary> kvp, int count, int sizeEach, int gap, Action<BasePlayer> callback)
+        {
+            if (GuiTracker.getGuiTracker(player).getContainer(PluginInstance, "PlayerSearch") == null) return;
+
+            GuiColor black60 = new GuiColor(0, 0, 0, 0.6f);
+            GuiColor black40 = new GuiColor(0, 0, 0, 0.4f);
+            GuiColor white70 = new GuiColor(1, 1, 1, 0.7f);
+
+            GuiContainer c = new GuiContainer(PluginInstance, $"{count}ImageContainer", "PlayerSearch");
+
+            //background
+            Rectangle entryBgPos = new Rectangle(715, 360 + count * (sizeEach + gap), 490, 80, 1920, 1080, true);
+            c.addPlainPanel($"{count}EntryBG", entryBgPos, GuiContainer.Layer.overall, black60, 0.2f, 0);
+
+            //ID
+            Rectangle idPos = new Rectangle(795, 365 + count * (sizeEach + gap), 405, 35, 1920, 1080, true);
+            GuiText idText = new GuiText($"[{kvp.Key.userID}]", 14, white70);
+            c.addText($"{count}id", idPos, GuiContainer.Layer.overall, idText, 0.2f, 0);
+
+            //Name
+            Rectangle namePos = new Rectangle(795, 400 + count * (sizeEach + gap), 405, 35, 1920, 1080, true);
+            GuiText nameText = new GuiText($"{kvp.Key.displayName}", getFontsizeByFramesize(kvp.Key.displayName.Length, namePos), white70);
+            c.addText($"{count}name", namePos, GuiContainer.Layer.overall, nameText, 0.2f, 0);
+
+            //button
+            Action<BasePlayer, string[]> buttonCb = (p2, a) =>
+            {
+                GuiTracker.getGuiTracker(player).destroyGui(PluginInstance, "PlayerSearch"); 
+                callback(kvp.Key);
+            };
+            c.addPlainButton($"{count}btnOverlay", entryBgPos, GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.2f, 0, callback: buttonCb, CursorEnabled: true);
+
+            Rectangle imgPos = new Rectangle(720, 365 + count * (sizeEach + gap), 70, 70, 1920, 1080, true);
+            c.addButton($"{count}Image", imgPos, GuiContainer.Layer.overall, null, 0.2f, 0, callback: buttonCb, close: "PlayerSearch", imgName: kvp.Key.UserIDString);
+
+            c.display(player);
+        }
+
         public void prompt(BasePlayer player, string header, string msg, Action<BasePlayer, string[]> Callback = null)
         {
             GuiContainer containerGUI = new GuiContainer(this, "prompt");
             containerGUI.addPlainButton("close", new Rectangle(), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.3f), 0.1f, 0.1f, blur: GuiContainer.Blur.medium);
             containerGUI.addPlainPanel("background", new Rectangle(710, 390, 500, 300, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0.6f), 0.1f, 0.1f, GuiContainer.Blur.medium);
             containerGUI.addPanel("header", new Rectangle(710, 390, 500, 60, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(header, 25, new GuiColor(1, 1, 1, 0.7f)));
-            containerGUI.addPanel("msg", new Rectangle(735, 450, 450, 150, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(msg, 10, new GuiColor(1, 1, 1, 0.7f)));
+            containerGUI.addPanel("msg", new Rectangle(735, 400, 450, 150, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 0, 0), 0.1f, 0.1f, new GuiText(msg, 14, new GuiColor(1, 1, 1, 0.7f)));
             containerGUI.addPlainButton("ok", new Rectangle(860, 520, 200, 50, 1920, 1080, true), GuiContainer.Layer.overall, new GuiColor(0, 0, 1, 0.6f), 0.1f, 0.1f, new GuiText("OK", 20, new GuiColor(1, 1, 1, 0.7f)), Callback, "prompt");
             containerGUI.display(player);
         }
@@ -219,14 +347,11 @@ namespace Oxide.Plugins
         {
             string safeName = $"{plugin.Name}_{name}";
 
-            if (ImageLibrary.Call<bool>("HasImage", safeName))
+            if (ImageLibrary.Call<bool>("HasImage", safeName, (ulong)0))
             {
                 callback?.Invoke();
             }
             else ImageLibrary.Call("AddImage", url, safeName, (ulong)0, callback);
-#if DEBUG
-            PrintToChat($"{plugin.Name} registered {name} image");
-#endif
         }
     }
 }﻿namespace Oxide.Plugins
@@ -307,9 +432,15 @@ namespace Oxide.Plugins
             cmd.AddConsoleCommand("gui.input", this, nameof(OnGuiInput));
             cmd.AddConsoleCommand("gui.list", this, nameof(listContainers));
 
+            cmd.AddChatCommand("player", this, nameof(PlayerSearchCommand));
             cmd.AddChatCommand("guidemo", this, nameof(demoCommand));
             cmd.AddChatCommand("img", this, nameof(imgPreviewCommand));
             cmd.AddChatCommand("imgraw", this, nameof(imgrawPreviewCommand));
+        }
+
+        private void PlayerSearchCommand(BasePlayer player, string command, string[] args)
+        {
+            PlayerSearch(player, args[0], (p) => player.ChatMessage($"player selected: {p.displayName}"));
         }
 
         private void closeUi(ConsoleSystem.Arg arg)
@@ -510,6 +641,7 @@ namespace Oxide.Plugins
 
         private class ConfigData
         {
+            public string steamAPIKey;
             public string gameTipIcon;
         }
 
@@ -517,6 +649,7 @@ namespace Oxide.Plugins
         {
             return new ConfigData
             {
+                steamAPIKey = "",
                 gameTipIcon = "https://i.imgur.com/VFBB8ib.png"
             };
         }
@@ -1171,6 +1304,8 @@ namespace Oxide.Plugins
             registerImage(this, "gameTipIcon", config.gameTipIcon);
             registerImage(this, "warning_alpha", "https://i.imgur.com/u0bNKXx.png");
             registerImage(this, "white_cross", "https://i.imgur.com/fbwkYDj.png");
+            registerImage(this, "triangle_up", "https://i.imgur.com/Boa8nZf.png");
+            registerImage(this, "triangle_down", "https://i.imgur.com/CaQOAjm.png");
         }
 
         private void Unload()
@@ -1204,6 +1339,67 @@ namespace Oxide.Plugins
         {
             {"noPermission", "You don't have permission to use this command!"}
         };
+    }
+}﻿namespace Oxide.Plugins
+{
+    using Newtonsoft.Json;
+    using Oxide.Core.Libraries;
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+
+    partial class GUICreator : RustPlugin
+    {
+        public class WebResponse
+        {
+            public SteamUser response;
+        }
+        
+        public class SteamUser
+        {
+            public PlayerSummary[] players;
+        }
+
+        public class PlayerSummary
+        {
+            public string steamid;
+            public string personaname;
+            public string profileurl;
+            public string avatarfull;
+        }
+
+        public void GetSteamUserData(List<ulong> steamIDs, Action<PlayerSummary[]> callback)
+        {
+            if(string.IsNullOrEmpty(config.steamAPIKey))
+            {
+                Puts(lang.GetMessage("apiKey", this));
+                return;
+            }
+            string url = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=" + config.steamAPIKey.ToString() + "&steamids=" + String.Join(",", steamIDs.Select(s => s.ToString()));
+            webrequest.Enqueue(url, null, (code, response) =>
+            {
+                if (code != 200 || response == null)
+                {
+                    Puts($"Couldn't get an answer from Steam!");
+                    return;
+                }
+                WebResponse webResponse = JsonConvert.DeserializeObject<WebResponse>(response);
+                if (webResponse?.response?.players == null)
+                {
+                    Puts("response is null");
+                    callback(null);
+                    return;
+                }
+                if(webResponse.response.players.Length == 0)
+                {
+                    Puts("response has no playerSummaries");
+                    callback(null);
+                    return;
+                }
+
+                callback(webResponse.response.players);
+            }, this, RequestMethod.GET);
+        }
     }
 }﻿namespace Oxide.Plugins
 {

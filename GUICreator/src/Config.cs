@@ -6,6 +6,7 @@
 
         private class ConfigData
         {
+            public string steamAPIKey;
             public string gameTipIcon;
         }
 
@@ -13,6 +14,7 @@
         {
             return new ConfigData
             {
+                steamAPIKey = "",
                 gameTipIcon = "https://i.imgur.com/VFBB8ib.png"
             };
         }
