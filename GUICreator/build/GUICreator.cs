@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("GUICreator", "kOhm", "1.4.0")]
+    [Info("GUICreator", "kOhm", "1.4.1")]
     [Description("API Plugin for centralized GUI creation and management")]
     public partial class GUICreator : RustPlugin
     {
@@ -76,7 +76,7 @@ namespace Oxide.Plugins
             container.display(player);
         }
 
-        public void PlayerSearch(BasePlayer player, string name, Action<BasePlayer> callback, int page = 0)
+        public void PlayerSearch(BasePlayer player, string name, Action<BasePlayer> callback)
         {
             if (string.IsNullOrEmpty(name)) return;
             ulong id;
@@ -86,6 +86,12 @@ namespace Oxide.Plugins
             if(results == null || results.Count == 0)
             {
                 prompt(player, "Player search", "No players found!");
+                return;
+            }
+
+            if(results.Count == 1)
+            {
+                callback(results[0]);
                 return;
             }
 

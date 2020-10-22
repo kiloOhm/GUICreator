@@ -49,7 +49,7 @@
             container.display(player);
         }
 
-        public void PlayerSearch(BasePlayer player, string name, Action<BasePlayer> callback, int page = 0)
+        public void PlayerSearch(BasePlayer player, string name, Action<BasePlayer> callback)
         {
             if (string.IsNullOrEmpty(name)) return;
             ulong id;
@@ -59,6 +59,12 @@
             if(results == null || results.Count == 0)
             {
                 prompt(player, "Player search", "No players found!");
+                return;
+            }
+
+            if(results.Count == 1)
+            {
+                callback(results[0]);
                 return;
             }
 
