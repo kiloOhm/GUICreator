@@ -1,4 +1,5 @@
 ﻿//#define DEBUG
+//#define CoroutineDEBUG
 
 using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
@@ -16,6 +17,8 @@ namespace Oxide.Plugins
         private Plugin ImageLibrary;
 
         private static GUICreator PluginInstance = null;
+
+        private static DownloadManager _DownloadManager;
 
         public GUICreator()
         {
@@ -76,6 +79,26 @@ namespace Oxide.Plugins
             container.display(player);
         }
 
+        public void Tickbox(BasePlayer player, Plugin plugin, Rectangle parentRectangle, GuiContainer.Layer layer, string name, string parentContainer, Action<BasePlayer, string[]> onTick, Action<BasePlayer, string[]> onUntick, bool initialState = false, bool disabled = false, float fadeIn = 0, float fadeOut = 0)
+        {
+            GuiContainer c = new GuiContainer(plugin, name + "_APITickbox", parentContainer);
+            GuiColor lightGrey = new GuiColor(0.5f, 0.5f, 0.5f, 1);
+            GuiColor darkGrey = new GuiColor(0.8f, 0.8f, 0.8f, 1);
+
+            if(initialState)
+            {
+                Rectangle fgPos = new Rectangle(0.15f, 0.15f, 0.72f, 0.72f, 1f, 1f, true).WithParent(parentRectangle);
+                c.addPlainButton("bg", parentRectangle, layer, disabled ? lightGrey : GuiColor.White, fadeIn, fadeOut, callback: disabled ? null : onUntick);
+                c.addPlainButton("fg", fgPos, layer, disabled ? darkGrey : GuiColor.Black, fadeIn, fadeOut, callback: disabled ? null : onUntick);
+            }
+            else
+            {
+                c.addPlainButton("bg", parentRectangle, layer, disabled ? lightGrey : GuiColor.White, fadeIn, fadeOut, callback: disabled ? null : onTick);
+            }
+
+            c.display(player);
+        }
+
         public void PlayerSearch(BasePlayer player, string name, Action<BasePlayer> callback)
         {
             if (string.IsNullOrEmpty(name)) return;
@@ -107,7 +130,7 @@ namespace Oxide.Plugins
             GetSteamUserData(results.Select(p => p.userID).ToList(), cb);
         }
 
-        public void SendPlayerSearchUI(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary>[] results, Action<BasePlayer> callback, int page = 0)
+        private void SendPlayerSearchUI(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary>[] results, Action<BasePlayer> callback, int page = 0)
         {
             List<List<KeyValuePair<BasePlayer, PlayerSummary>>> listOfLists = SplitIntoChunks(results.ToList(), 5);
 
@@ -166,12 +189,12 @@ namespace Oxide.Plugins
                 {
                     SendEntry(player, kvp, ccount, csizeEach, cgap, callback);
                 };
-                registerImage(PluginInstance, kvp.Key.UserIDString, kvp.Value.avatarfull, imageCb);
+                registerImage(PluginInstance, kvp.Key.UserIDString, kvp.Value.avatarfull, imageCb, true);
                 count++;
             }
         }
 
-        public void SendEntry(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary> kvp, int count, int sizeEach, int gap, Action<BasePlayer> callback)
+        private void SendEntry(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary> kvp, int count, int sizeEach, int gap, Action<BasePlayer> callback)
         {
             if (GuiTracker.getGuiTracker(player).getContainer(PluginInstance, "PlayerSearch") == null) return;
 
@@ -272,9 +295,9 @@ namespace Oxide.Plugins
         {
             if (allowNew) options.Add("(add new)");
             int maxItems = 5;
+            rectangle.H *= ((float)options.Count / (float)maxItems);
             List<List<string>> ListOfLists = SplitIntoChunks<string>(options, maxItems);
             GuiContainer container = new GuiContainer(plugin, "dropdown_API", parent);
-            container.addPlainPanel("dropdown_background", rectangle, GuiContainer.Layer.menu, new GuiColor(0,0,0,0), 0, 0, GuiContainer.Blur.medium);
 
             double cfX = rectangle.W / 300;
             double cfY = rectangle.H / 570;
@@ -316,7 +339,7 @@ namespace Oxide.Plugins
             container.display(player);
         }
 
-        public void dropdownAddNew(Plugin plugin, BasePlayer player, Rectangle rectangle, Action<string> callback, Predicate<string> predicate)
+        private void dropdownAddNew(Plugin plugin, BasePlayer player, Rectangle rectangle, Action<string> callback, Predicate<string> predicate)
         {
             GuiContainer container = new GuiContainer(this, "dropdown_addNew", "dropdown_API");
             Action<BasePlayer, string[]> inputCallback = (bPlayer, input) =>
@@ -349,15 +372,37 @@ namespace Oxide.Plugins
             container.display(player);
         }
 
-        public void registerImage(Plugin plugin, string name, string url, Action callback = null)
+        public void registerImage(Plugin plugin, string name, string url, Action callback = null, bool force = false, int? imgSizeX = null, int? imgSizeY = null)
+        {
+            string safeName = $"{plugin.Name}_{name}";
+
+            if (!force && ImageLibrary.Call<bool>("HasImage", safeName, (ulong)0))
+            {
+                callback?.Invoke();
+            }
+            else
+            {
+                if (imgSizeX != null && imgSizeY != null)
+                {
+                    _DownloadManager.Enqueue(new DownloadManager.Request {SafeName = safeName, Url = url, ImgSizeX = imgSizeX.Value, ImgSizeY = imgSizeY.Value, Callback = callback });
+                }
+                else
+                {
+                    ImageLibrary.Call("AddImage", url, safeName, (ulong)0, callback);
+                }
+            }
+        }
+
+        public bool HasImage(Plugin plugin, string name)
         {
             string safeName = $"{plugin.Name}_{name}";
 
             if (ImageLibrary.Call<bool>("HasImage", safeName, (ulong)0))
             {
-                callback?.Invoke();
+                return true;
             }
-            else ImageLibrary.Call("AddImage", url, safeName, (ulong)0, callback);
+
+            return false;
         }
     }
 }﻿namespace Oxide.Plugins
@@ -446,6 +491,7 @@ namespace Oxide.Plugins
 
         private void PlayerSearchCommand(BasePlayer player, string command, string[] args)
         {
+            if (args.Length == 0) return;
             PlayerSearch(player, args[0], (p) => player.ChatMessage($"player selected: {p.displayName}"));
         }
 
@@ -686,6 +732,69 @@ namespace Oxide.Plugins
         {
             Config.WriteObject(config);
         }
+    }
+}﻿namespace Oxide.Plugins
+{
+    using System;
+    using System.Collections;
+    using System.Collections.Generic;
+    using UnityEngine;
+
+    public partial class GUICreator
+    {
+        private class DownloadManager
+        {
+            private Queue<Request> Requests = new Queue<Request>();
+            private bool loading = false;
+
+            public void Enqueue(Request request)
+            {
+                Requests.Enqueue(request);
+                if(!loading)
+                {
+                    ServerMgr.Instance.StartCoroutine(Process());
+                }
+            }
+
+            private IEnumerator Process()
+            {
+                if(loading)
+                {
+                    yield break;
+                }
+                loading = true;
+
+                Request request = Requests.Dequeue();
+                request.ProcessDownload(() =>
+                {
+                    loading = false;
+                    ServerMgr.Instance.StartCoroutine(Process());
+                });
+            }
+
+            public class Request
+            {
+                public string SafeName { get; set; }
+                public string Url { get; set; }
+                public int ImgSizeX { get; set; }
+                public int ImgSizeY { get; set; }
+                public Action Callback { get; set; }
+
+                public void ProcessDownload(Action finishCallback)
+                {
+                    var il = new GameObject("WebObject").AddComponent<ImageLoader>();
+                    il.StartCoroutine(il.DownloadImage(Url, (b) =>
+                    {
+                        PluginInstance.ImageLibrary.Call("AddImageData", SafeName, b, (ulong)0, Callback);
+                        finishCallback();
+#if CoroutineDEBUG
+                    PluginInstance.Puts($"completed processing image download: {SafeName}");
+#endif
+
+                    }, ImgSizeX, ImgSizeY, finishCallback));
+                }
+            }
+        }            
     }
 }﻿namespace Oxide.Plugins
 {
@@ -1306,12 +1415,15 @@ namespace Oxide.Plugins
                 Puts("ImageLibrary is not loaded! get it here https://umod.org/plugins/image-library");
                 return;
             }
+
+            _DownloadManager = new DownloadManager();
+
             registerImage(this, "flower", "https://i.imgur.com/uAhjMNd.jpg");
             registerImage(this, "gameTipIcon", config.gameTipIcon);
             registerImage(this, "warning_alpha", "https://i.imgur.com/u0bNKXx.png");
             registerImage(this, "white_cross", "https://i.imgur.com/fbwkYDj.png");
             registerImage(this, "triangle_up", "https://i.imgur.com/Boa8nZf.png");
-            registerImage(this, "triangle_down", "https://i.imgur.com/CaQOAjm.png");
+            registerImage(this, "triangle_down", "https://i.imgur.com/CaQOAjm.png");   
         }
 
         private void Unload()
@@ -1324,11 +1436,143 @@ namespace Oxide.Plugins
             PluginInstance = null;
             GuiContainer.blurs = null;
             GuiContainer.layers = null;
+            _DownloadManager = null;
         }
 
         private void OnPlayerDisconnected(BasePlayer player, string reason)
         {
             GuiTracker.getGuiTracker(player).destroyAllGui();
+        }
+    }
+}﻿namespace Oxide.Plugins
+{
+    using System;
+    using System.Collections;
+    using System.Drawing;
+    using System.Drawing.Imaging;
+    using System.IO;
+    using System.Linq;
+    using UnityEngine;
+    using UnityEngine.Networking;
+
+    public partial class GUICreator
+    {
+        public class ImageLoader : MonoBehaviour
+        {
+
+            public IEnumerator DownloadImage(string url, Action<byte[]> callback, int? sizeX = null, int? sizeY = null, Action ErrorCallback = null)
+            {
+                UnityWebRequest www = UnityWebRequest.Get(url);
+
+                yield return www.SendWebRequest();
+
+                if (www.isNetworkError || www.isHttpError)
+                {
+                    PluginInstance.Puts(string.Format("Image failed to download! Error: {0}, Image URL: {1}", www.error, url));
+                    www.Dispose();
+                    ErrorCallback?.Invoke();
+                    yield break;
+                }
+
+                Texture2D texture = new Texture2D(2, 2);
+                texture.LoadImage(www.downloadHandler.data);
+
+                byte[] originalBytes = null;
+                byte[] resizedBytes = null;
+
+                if (texture != null)
+                {
+                    originalBytes = texture.EncodeToPNG();
+                }
+                else
+                {
+                    ErrorCallback?.Invoke();
+                }
+
+                if (sizeX != null && sizeY != null)
+                {
+                    resizedBytes = Resize(originalBytes, sizeX.Value, sizeY.Value, sizeX.Value, sizeY.Value, true);
+                }
+
+                if(originalBytes.Length <= resizedBytes.Length)
+                {
+                    callback(originalBytes);
+                }
+                else
+                {
+                    callback(resizedBytes);
+                }
+
+                www.Dispose();
+            }
+
+            //public static byte[] Resize(byte[] bytes, int sizeX, int sizeY)
+            //{
+            //    Image img = (Bitmap)(new ImageConverter().ConvertFrom(bytes));
+            //    Bitmap cutPiece = new Bitmap(sizeX, sizeY);
+            //    System.Drawing.Graphics graphic = System.Drawing.Graphics.FromImage(cutPiece);
+            //    graphic.DrawImage(img, new System.Drawing.Rectangle(0, 0, sizeX, sizeY), 0, 0, img.Width, img.Height, GraphicsUnit.Pixel);
+            //    graphic.Dispose();
+            //    MemoryStream ms = new MemoryStream();
+            //    cutPiece.Save(ms, ImageFormat.Jpeg);
+            //    return ms.ToArray();
+            //}
+
+            public static byte[] Resize(byte[] bytes, int width, int height, int targetWidth, int targetHeight, bool enforceJpeg, RotateFlipType rotation = RotateFlipType.RotateNoneFlipNone)
+            {
+                byte[] resizedImageBytes;
+
+                using (MemoryStream originalBytesStream = new MemoryStream(), resizedBytesStream = new MemoryStream())
+                {
+                    // Write the downloaded image bytes array to the memorystream and create a new Bitmap from it.
+                    originalBytesStream.Write(bytes, 0, bytes.Length);
+                    Bitmap image = new Bitmap(originalBytesStream);
+
+                    if (rotation != RotateFlipType.RotateNoneFlipNone)
+                    {
+                        image.RotateFlip(rotation);
+                    }
+
+                    // Check if the width and height match, if they don't we will have to resize this image.
+                    if (image.Width != targetWidth || image.Height != targetHeight)
+                    {
+                        // Create a new Bitmap with the target size.
+                        Bitmap resizedImage = new Bitmap(width, height);
+
+                        // Draw the original image onto the new image and resize it accordingly.
+                        using (System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(resizedImage))
+                        {
+                            graphics.DrawImage(image, new System.Drawing.Rectangle(0, 0, targetWidth, targetHeight));
+                        }
+
+
+                        // Save the bitmap to a MemoryStream as either Jpeg or Png.
+                        if (enforceJpeg)
+                        {
+                            resizedImage.Save(resizedBytesStream, ImageFormat.Jpeg);
+                        }
+                        else
+                        {
+                            resizedImage.Save(resizedBytesStream, ImageFormat.Png);
+                        }
+
+                        // Grab the bytes array from the new image's MemoryStream and dispose of the resized image Bitmap.
+                        resizedImageBytes = resizedBytesStream.ToArray();
+                        resizedImage.Dispose();
+                    }
+                    else
+                    {
+                        // The image has the correct size so we can just return the original bytes without doing any resizing.
+                        resizedImageBytes = bytes;
+                    }
+
+                    // Dispose of the original image Bitmap.
+                    image.Dispose();
+                }
+
+                // Return the bytes array.
+                return resizedImageBytes;
+            }
         }
     }
 }﻿namespace Oxide.Plugins
@@ -1562,6 +1806,14 @@ namespace Oxide.Plugins
             {
                 return "#" + ColorUtility.ToHtmlStringRGBA(color);
             }
+
+            public static GuiColor Transparent => new GuiColor(0, 0, 0, 0);
+            public static GuiColor White => new GuiColor(1, 1, 1, 1);
+            public static GuiColor Black => new GuiColor(0, 0, 0, 1);
+            public static GuiColor Red => new GuiColor(1, 0, 0, 1);
+            public static GuiColor Green => new GuiColor(0, 1, 0, 1);
+            public static GuiColor Blue => new GuiColor(0, 0, 1, 1);
+
         }
     }
 }﻿namespace Oxide.Plugins
@@ -2131,6 +2383,8 @@ namespace Oxide.Plugins
 
             public static GuiPlainPanel GetNewGuiPlainPanel(string name, Rectangle rectangle, GuiElement parent = null, Layer layer = Layer.hud, GuiColor panelColor = null, float fadeIn = 0, float fadeOut = 0, Blur blur = Blur.none)
             {
+
+                //PluginInstance.Puts($"name: {name ?? "null"}, rect: {rectangle?.ToString() ?? "null"}, parent: {parent?.ToString() ?? "null"}, layer: {layer}, panelColor: {panelColor?.ToString() ?? "null"}, fadein: {fadeIn}, fadeOut: {fadeOut}, blur: {blur}");
 
                 Layer higherLayer = layer;
                 if (parent != null) higherLayer = (Layer)Math.Min((int)layer, (int)parent.Layer);

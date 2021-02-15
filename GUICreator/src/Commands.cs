@@ -23,6 +23,7 @@
 
         private void PlayerSearchCommand(BasePlayer player, string command, string[] args)
         {
+            if (args.Length == 0) return;
             PlayerSearch(player, args[0], (p) => player.ChatMessage($"player selected: {p.displayName}"));
         }
 

@@ -18,6 +18,8 @@
             public static GuiPlainPanel GetNewGuiPlainPanel(string name, Rectangle rectangle, GuiElement parent = null, Layer layer = Layer.hud, GuiColor panelColor = null, float fadeIn = 0, float fadeOut = 0, Blur blur = Blur.none)
             {
 
+                //PluginInstance.Puts($"name: {name ?? "null"}, rect: {rectangle?.ToString() ?? "null"}, parent: {parent?.ToString() ?? "null"}, layer: {layer}, panelColor: {panelColor?.ToString() ?? "null"}, fadein: {fadeIn}, fadeOut: {fadeOut}, blur: {blur}");
+
                 Layer higherLayer = layer;
                 if (parent != null) higherLayer = (Layer)Math.Min((int)layer, (int)parent.Layer);
 

@@ -137,6 +137,14 @@
             {
                 return "#" + ColorUtility.ToHtmlStringRGBA(color);
             }
+
+            public static GuiColor Transparent => new GuiColor(0, 0, 0, 0);
+            public static GuiColor White => new GuiColor(1, 1, 1, 1);
+            public static GuiColor Black => new GuiColor(0, 0, 0, 1);
+            public static GuiColor Red => new GuiColor(1, 0, 0, 1);
+            public static GuiColor Green => new GuiColor(0, 1, 0, 1);
+            public static GuiColor Blue => new GuiColor(0, 0, 1, 1);
+
         }
     }
 }

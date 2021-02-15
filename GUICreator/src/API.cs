@@ -49,6 +49,26 @@
             container.display(player);
         }
 
+        public void Tickbox(BasePlayer player, Plugin plugin, Rectangle parentRectangle, GuiContainer.Layer layer, string name, string parentContainer, Action<BasePlayer, string[]> onTick, Action<BasePlayer, string[]> onUntick, bool initialState = false, bool disabled = false, float fadeIn = 0, float fadeOut = 0)
+        {
+            GuiContainer c = new GuiContainer(plugin, name + "_APITickbox", parentContainer);
+            GuiColor lightGrey = new GuiColor(0.5f, 0.5f, 0.5f, 1);
+            GuiColor darkGrey = new GuiColor(0.8f, 0.8f, 0.8f, 1);
+
+            if(initialState)
+            {
+                Rectangle fgPos = new Rectangle(0.15f, 0.15f, 0.72f, 0.72f, 1f, 1f, true).WithParent(parentRectangle);
+                c.addPlainButton("bg", parentRectangle, layer, disabled ? lightGrey : GuiColor.White, fadeIn, fadeOut, callback: disabled ? null : onUntick);
+                c.addPlainButton("fg", fgPos, layer, disabled ? darkGrey : GuiColor.Black, fadeIn, fadeOut, callback: disabled ? null : onUntick);
+            }
+            else
+            {
+                c.addPlainButton("bg", parentRectangle, layer, disabled ? lightGrey : GuiColor.White, fadeIn, fadeOut, callback: disabled ? null : onTick);
+            }
+
+            c.display(player);
+        }
+
         public void PlayerSearch(BasePlayer player, string name, Action<BasePlayer> callback)
         {
             if (string.IsNullOrEmpty(name)) return;
@@ -80,7 +100,7 @@
             GetSteamUserData(results.Select(p => p.userID).ToList(), cb);
         }
 
-        public void SendPlayerSearchUI(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary>[] results, Action<BasePlayer> callback, int page = 0)
+        private void SendPlayerSearchUI(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary>[] results, Action<BasePlayer> callback, int page = 0)
         {
             List<List<KeyValuePair<BasePlayer, PlayerSummary>>> listOfLists = SplitIntoChunks(results.ToList(), 5);
 
@@ -139,12 +159,12 @@
                 {
                     SendEntry(player, kvp, ccount, csizeEach, cgap, callback);
                 };
-                registerImage(PluginInstance, kvp.Key.UserIDString, kvp.Value.avatarfull, imageCb);
+                registerImage(PluginInstance, kvp.Key.UserIDString, kvp.Value.avatarfull, imageCb, true);
                 count++;
             }
         }
 
-        public void SendEntry(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary> kvp, int count, int sizeEach, int gap, Action<BasePlayer> callback)
+        private void SendEntry(BasePlayer player, KeyValuePair<BasePlayer, PlayerSummary> kvp, int count, int sizeEach, int gap, Action<BasePlayer> callback)
         {
             if (GuiTracker.getGuiTracker(player).getContainer(PluginInstance, "PlayerSearch") == null) return;
 
@@ -245,9 +265,9 @@
         {
             if (allowNew) options.Add("(add new)");
             int maxItems = 5;
+            rectangle.H *= ((float)options.Count / (float)maxItems);
             List<List<string>> ListOfLists = SplitIntoChunks<string>(options, maxItems);
             GuiContainer container = new GuiContainer(plugin, "dropdown_API", parent);
-            container.addPlainPanel("dropdown_background", rectangle, GuiContainer.Layer.menu, new GuiColor(0,0,0,0), 0, 0, GuiContainer.Blur.medium);
 
             double cfX = rectangle.W / 300;
             double cfY = rectangle.H / 570;
@@ -289,7 +309,7 @@
             container.display(player);
         }
 
-        public void dropdownAddNew(Plugin plugin, BasePlayer player, Rectangle rectangle, Action<string> callback, Predicate<string> predicate)
+        private void dropdownAddNew(Plugin plugin, BasePlayer player, Rectangle rectangle, Action<string> callback, Predicate<string> predicate)
         {
             GuiContainer container = new GuiContainer(this, "dropdown_addNew", "dropdown_API");
             Action<BasePlayer, string[]> inputCallback = (bPlayer, input) =>
@@ -322,15 +342,37 @@
             container.display(player);
         }
 
-        public void registerImage(Plugin plugin, string name, string url, Action callback = null)
+        public void registerImage(Plugin plugin, string name, string url, Action callback = null, bool force = false, int? imgSizeX = null, int? imgSizeY = null)
+        {
+            string safeName = $"{plugin.Name}_{name}";
+
+            if (!force && ImageLibrary.Call<bool>("HasImage", safeName, (ulong)0))
+            {
+                callback?.Invoke();
+            }
+            else
+            {
+                if (imgSizeX != null && imgSizeY != null)
+                {
+                    _DownloadManager.Enqueue(new DownloadManager.Request {SafeName = safeName, Url = url, ImgSizeX = imgSizeX.Value, ImgSizeY = imgSizeY.Value, Callback = callback });
+                }
+                else
+                {
+                    ImageLibrary.Call("AddImage", url, safeName, (ulong)0, callback);
+                }
+            }
+        }
+
+        public bool HasImage(Plugin plugin, string name)
         {
             string safeName = $"{plugin.Name}_{name}";
 
             if (ImageLibrary.Call<bool>("HasImage", safeName, (ulong)0))
             {
-                callback?.Invoke();
+                return true;
             }
-            else ImageLibrary.Call("AddImage", url, safeName, (ulong)0, callback);
+
+            return false;
         }
     }
 }
