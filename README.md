@@ -4,27 +4,7 @@ There are also several handy functions in the GuiContainer class to keep the lin
 
 Classes:
 
-	Rectangle, derived from CuiRectTransformComponent
-	Not reinventing the wheel here, just providing more flexibility for defining CuiRectTransformComponents.
-	coordinates are fractions of the total resolution of each client screen. (e.g. "0.5 0.5" is the middle of the screen )
-	Relevant properties:
-		double anchorMinX - X value of the bottom left corner
-        double anchorMinY - Y value of the bottom left corner
-        double anchorMaxX - X value of the top right corner
-        double anchorMaxY - Y value of the top right corner
-		double X - X Value of Origin (default: bottom left corner, if topLeftOrigin is true, top left corner)
-		double Y - Y Value of Origin (default: bottom left corner, if topLeftOrigin is true, top left corner)
-		double W - Width of Rectangle
-		double H - Height of Rectangle
-		bool topLeftOrigin - determines origin. for use with figma
-
-	Constructors:
-		The default constructor sets anchorMinX and anchorMinY to 0, anchorMaxX and anchorMaxY to 1. The rectangle spans the entire screen/parent
-		
-		Rectangle(double X, double Y, double W, double H, double resX = 1, double resY = 1, bool topLeftOrigin = false)
-		- x and y are the coordinate of the bottom left (or top left if topLeftOrigin is true) corner. W is the width, H is H is the height of the rectangle.
-		  resX is the horizontal resolution and resY the vertical resolution. (x = 10, y = 10, resX = 20, resY = 20) is the middle of the screen.
-		  This was intended for use with figma (or similar UI Desing tools). For use with figma, set topLeftOrigin to true and set resX, resY to the dimensions of your frame.
+	Rectangle, WIP
 
 
 	GuiColor
@@ -64,39 +44,7 @@ Classes:
 	Wrapper for CuiInputfieldComponent, RectTransformComponent because it's not included in Umod's CuiHelper class
 
 	
-	GuiContainer, derived from CuiElementContainer, derived from List<CuiElement>
-	It's intended that all GUI Elements are bundled in GuiContainers.
-	Relevant properties:
-		Plugin plugin - reference to the Plugin that created this container
-        string name - individual name (when trying to display a container with the name of an already existing container, the already existing container will be destroyed)
-        string parent - parent container (when destroying a container, all children containers are also destroyed, container parenting has no impact on positioning though)
-		List<Timer> timers - Collection for timers tied to this container. all timers are destroyed upon destruction of container
-		enum Layer { overall, overlay, menu, hud, under } - layers on which GUI can be displayed. The Rust Hud and UI is displayed between hud and menu.
-	Constructors:
-		There is no default constructor
-		GuiContainer(Plugin plugin, string name, string parent = null, Action<BasePlayer> closeCallback = null)
-		Parenting GuiContainers doesn't affect positioning but destroys all children containers upon destruction.
-		closeCallback is invoked before the guiContainer is destroyed.
-	Relevant Methods:
-		display(BasePlayer player)
-		destroy(BasePlayer player)
-		addPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, string imgName = null, bool blur = false)
-		addPlainPanel(string name, CuiRectTransformComponent rectangle, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, bool blur = false)
-		addImage(string name, CuiRectTransformComponent rectangle, string imgName, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
-		- displays image, that has previously been registered by its plugin
-
-		addRawImage(string name, CuiRectTransformComponent rectangle, string imgData, string parent = "Hud", GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0)
-		- displays image from raw image data. to be used with an API call to ImageLibrary or with the API Method "string getItemIcon(string shortname)"
-
-		addText(string name, CuiRectTransformComponent rectangle, GuiText text = null, float FadeIn = 0, float FadeOut = 0, string parent = "Hud")
-		addButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string imgName = null, string parent = "Hud")
-		addPlainButton(string name, CuiRectTransformComponent rectangle, GuiColor panelColor = null, float FadeIn = 0, float FadeOut = 0, GuiText text = null, Action<BasePlayer, string[]> callback = null, string close = null, bool CursorEnabled = true, string parent = "Hud")
-		addInput(string name, CuiRectTransformComponent rectangle, Action<BasePlayer, string[]> callback, string parent = "Hud", string close = null, GuiColor panelColor = null, int charLimit = 100, GuiText text = null, float FadeIn = 0, float FadeOut = 0, bool isPassword = false, bool CursorEnabled = true, string imgName = null)
-
-	If you specify names of other elements within the container in the "close" strings of Buttons and Inputs, said elements and their children will be destroyed on click/enter
-	I recommend using the least complex method (plainPanel, plainButton, text, image) for your task to reduce Cui Components that are sent to clients.
-	Singular GUI Elements can only be parented to other Elements within their container. Children Elements are destroyed upon destruction of their parents and have their frame overridden to be the RectTransform of their parent.
-	Instead of parents, all methods take a layer also. 
+	GuiContainer, WIP
 
 
 	GuiTracker, derived from MonoBehaviour
@@ -113,24 +61,16 @@ Classes:
 		destroyAllGui(Plugin plugin) - destroys all GUI sent by the specified plugin.
 
 API Methods:
-	
-	customGameTip(BasePlayer player, string text, float duration = 0, gametipType type = gametipType.gametip)
-	- displays a gametip-like popup above the players inventory. there are three types: gametip(default), warning, error
-	  calling gametips destroys any gametip which was previously there. leaving duration on 0 is not recommended!
 
-	registerImage(Plugin plugin, string name, string url)
-	- registers an Image for later use. Image storage is handled by ImageLibrary.
-	  the name can be referenced via the addImage/addPanel/addButton methods of GuiContainer.
-
-	string getItemIcon(string shortname) - returns raw image data of an item icon for use with addRawImage
+	WIP
 
 Commands:
 
 	Console:
 		gui.close - closes all gui sent by this plugin on a client.
 		gui.input - used to call button/input callbacks. can be used manually for debugging
+		gui.list - lists all active UI elements for debugging
 	Chat:
 	-these require the player to have the oxide permission "gui.demo"
 		/guidemo - demonstrates all elements
 		/img [url] - displays an image after it's been downloaded
-		/imgraw [imgData] - displays an image from raw image data. for debugging
