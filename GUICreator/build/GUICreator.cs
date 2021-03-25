@@ -418,13 +418,14 @@ namespace Oxide.Plugins
     {
         private class ColorPicker
         {
-            private const float fadeIn = 0.5f;
-            private const float fadeOut = 0.5f;
+            private const float fadeIn = 0.1f;
+            private const float fadeOut = 0.1f;
             private const int resX = 1920;
             private const int resY = 1080;
             private const GuiContainer.Layer layer = GuiContainer.Layer.hud;
-            private const int hueRes = 20;
-            private const int svRes = 7;
+            private const int hueRes = 25;
+            private const int satRes = 10;
+            private const int valueRes = 7;
 
             public BasePlayer Player { get; set; }
 
@@ -454,6 +455,7 @@ namespace Oxide.Plugins
             public void Display()
             {
                 SendBackgound();
+                SendButton();
                 SendHuePicker();
             }
 
@@ -492,10 +494,13 @@ namespace Oxide.Plugins
                     Rectangle pos = new Rectangle(baseX + i * width, y, width, height, resX, resY, true);
                     GuiColor color = new GuiColor(i * hueIncrement, 1, 1, 1);
                     int hue = (int)(i * hueIncrement);
+
+                    int index = i;
+
                     Action<BasePlayer, string[]> callback = (p, a) =>
                     {
                         Hue = hue;
-                        SendHueSelector();
+                        SendHueSelector(index);
                         SendVSPicker();
                     };
 
@@ -504,18 +509,17 @@ namespace Oxide.Plugins
 
                 c.display(Player);
 
-                SendHueSelector();
+                SendHueSelector(0);
                 SendVSPicker();
             }
 
-            private void SendHueSelector()
+            private void SendHueSelector(int i)
             {
                 GuiContainer c = new GuiContainer(PluginInstance, "HueSelector", "HuePicker");
 
                 int baseX = 603;
                 int y = 722;
                 double width = 700d / hueRes;
-                int i = (int)(Hue / 360d * hueRes);
                 double hueIncrement = 360d / hueRes;
 
                 Rectangle pos = new Rectangle(baseX + i * width, y, 50, 50, resX, resY, true);
@@ -531,23 +535,28 @@ namespace Oxide.Plugins
 
                 int baseX = 610;
                 int baseY = 330;
-                double width = 375d / (svRes + 1);
-                double height = 375d / (svRes + 1);
-                double svIncrement = 1d / svRes;
+                double width = 525d / (satRes + 1);
+                double height = 375d / (valueRes + 1);
+                double satIncrement = 1d / satRes;
+                double valIncrement = 1d / valueRes;
 
-                for(int v = 0; v <= svRes; v++)
+                for (int v = 0; v <= valueRes; v++)
                 {
-                    for(int s = 0; s <= svRes; s++)
+                    for(int s = 0; s <= satRes; s++)
                     {
-                        double saturation = s * svIncrement;
-                        double value = (svRes - v) * svIncrement;
+                        double saturation = s * satIncrement;
+                        double value = (valueRes - v) * valIncrement;
                         Rectangle pos = new Rectangle(baseX + s * width, baseY + v * height, width, height, resX, resY, true);
                         GuiColor color = new GuiColor(Hue, saturation, value, 1);
+
+                        int si = s;
+                        int vi = v;
 
                         Action<BasePlayer, string[]> callback = (p, a) =>
                         {
                             Saturation = saturation;
                             Value = value;
+                            SendSVSelector(si, vi);
                             SendPreview();
                         };
 
@@ -560,25 +569,39 @@ namespace Oxide.Plugins
                 SendPreview();
             }
 
+            private void SendSVSelector(int s, int v)
+            {
+                GuiContainer c = new GuiContainer(PluginInstance, "SVSelector", "SVPicker");
+
+                int baseX = 595;
+                int baseY = 315;
+                double width = 525d / (satRes + 1);
+                double height = 375d / (valueRes + 1);
+
+                Rectangle pos = new Rectangle(baseX + s * width, baseY + v * height, 75, 75, resX, resY, true);
+                GuiColor color = new GuiColor(Hue, Saturation, Value, 1);
+                c.addImage("selected", pos, "circle", layer, color, fadeIn, fadeOut);
+
+                c.display(Player);
+            }
+
             private void SendPreview()
             {
                 GuiContainer c = new GuiContainer(PluginInstance, "Preview", nameof(ColorPicker));
 
-                Rectangle pos = new Rectangle(1060, 330, 250, 250, resX, resY, true);
+                Rectangle pos = new Rectangle(1160, 368, 150, 150, resX, resY, true);
                 GuiColor color = new GuiColor(Hue, Saturation, Value, 1);
 
                 c.addPlainPanel("panel", pos, layer, color, fadeIn, fadeOut);
 
                 c.display(Player);
-
-                SendButton();
             }
 
             private void SendButton()
             {
                 GuiContainer c = new GuiContainer(PluginInstance, "Ok", nameof(ColorPicker));
 
-                Rectangle pos = new Rectangle(1110, 620, 150, 60, resX, resY, true);
+                Rectangle pos = new Rectangle(1160, 540, 150, 60, resX, resY, true);
                 GuiColor color = new GuiColor(0, 1, 0, 0.5f);
                 GuiText text = new GuiText("OK", 30, GuiColor.White.withAlpha(0.7f));
 
