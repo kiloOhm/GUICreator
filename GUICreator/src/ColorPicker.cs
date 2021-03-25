@@ -175,9 +175,10 @@
                 Action<BasePlayer, string[]> callback = (p, a) =>
                 {
                     Callback?.Invoke(new GuiColor(Hue, Value, Saturation, 1));
+                    GuiTracker.getGuiTracker(Player).destroyGui(PluginInstance, nameof(ColorPicker));
                 };
 
-                c.addPlainButton("button", pos, layer, color, fadeIn, fadeOut, text, callback, close: nameof(ColorPicker));
+                c.addPlainButton("button", pos, layer, color, fadeIn, fadeOut, text, callback);
 
                 c.display(Player);
             }
