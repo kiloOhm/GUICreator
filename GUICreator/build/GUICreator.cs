@@ -562,8 +562,6 @@ namespace Oxide.Plugins
 
             private void SendPreview()
             {
-                Player.ChatMessage($"H: {Hue}, S: {Saturation}, V: {Value}");
-
                 GuiContainer c = new GuiContainer(PluginInstance, "Preview", nameof(ColorPicker));
 
                 Rectangle pos = new Rectangle(1060, 330, 250, 250, resX, resY, true);
