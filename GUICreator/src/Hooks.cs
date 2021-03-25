@@ -25,7 +25,8 @@
             registerImage(this, "warning_alpha", "https://i.imgur.com/u0bNKXx.png");
             registerImage(this, "white_cross", "https://i.imgur.com/fbwkYDj.png");
             registerImage(this, "triangle_up", "https://i.imgur.com/Boa8nZf.png");
-            registerImage(this, "triangle_down", "https://i.imgur.com/CaQOAjm.png");   
+            registerImage(this, "triangle_down", "https://i.imgur.com/CaQOAjm.png");
+            registerImage(this, "circle", "https://i.imgur.com/hUeA7Lc.png");
         }
 
         private void Unload()

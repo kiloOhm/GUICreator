@@ -342,6 +342,11 @@
             container.display(player);
         }
 
+        public void SendColorPicker(BasePlayer player, Action<GuiColor> callback, string header = "Color Picker")
+        {
+            new ColorPicker(player, callback, header);
+        }
+
         public void registerImage(Plugin plugin, string name, string url, Action callback = null, bool force = false, int? imgSizeX = null, int? imgSizeY = null)
         {
             string safeName = $"{plugin.Name}_{name}";

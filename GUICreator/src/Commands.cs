@@ -19,12 +19,18 @@
             cmd.AddChatCommand("guidemo", this, nameof(demoCommand));
             cmd.AddChatCommand("img", this, nameof(imgPreviewCommand));
             cmd.AddChatCommand("imgraw", this, nameof(imgrawPreviewCommand));
+            cmd.AddChatCommand("colorpicker", this, nameof(colorpickerCommand));
         }
 
         private void PlayerSearchCommand(BasePlayer player, string command, string[] args)
         {
             if (args.Length == 0) return;
             PlayerSearch(player, args[0], (p) => player.ChatMessage($"player selected: {p.displayName}"));
+        }
+
+        private void colorpickerCommand(BasePlayer player, string command, string[] args)
+        {
+            SendColorPicker(player, (c) => player.ChatMessage($"R: {c.color.r} G: {c.color.g} B: {c.color.b}"));
         }
 
         private void closeUi(ConsoleSystem.Arg arg)

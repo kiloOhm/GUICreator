@@ -23,7 +23,7 @@
 
             private IEnumerator Process()
             {
-                if(loading)
+                if(loading || Requests.Count == 0)
                 {
                     yield break;
                 }
